@@ -1,0 +1,907 @@
+'=======================================
+' SUBMARINE モドキ
+' 2017/11/09 sacokoala
+'=======================================
+OPTION STRICT
+
+'-------------------
+' GLOBAL VARIABLE
+VAR locate_addr=&HD000
+VAR hi_score=10
+VAR game_wait=4
+VAR game_rank=0
+
+VAR c$
+VAR b,lx,ly
+VAR i,r,x,y,w
+VAR flag
+
+' INIT
+GOSUB @SB_INIT
+
+'-------------------
+' SCENE LOOP
+@SCENE_TOP
+
+' TITLE
+GOSUB @TITLE_SCENE
+
+' GAME
+GOSUB @GAME_SCENE
+
+GOTO @SCENE_TOP
+'-------------------
+
+' END FUNC
+EMUWINDOW 0
+PRINT "PROGRAM END"
+
+
+'=======================================
+
+'-------------------
+' GAME SCENE
+@GAME_SCENE
+
+'---------
+' GAME VAR
+
+ ' PLAYER
+ VAR score=0
+ VAR score_add=1
+ VAR player_num=3
+ VAR player_num_max=3
+ VAR player_dead=FALSE
+ VAR px=30/2
+ VAR py=1
+ VAR px_min=0+4
+ VAR px_max=30-4
+ VAR attack_wait=0
+ VAR attack_wait_max=7
+
+ ' WEAPON
+ VAR weapon_max=4
+ VAR weapon_num=0
+ VAR weapon_count=0
+ DIM wx[weapon_max], wy[weapon_max]
+ VAR wy_max=23
+ DIM w_wait[weapon_max]
+ VAR w_wait_max=4
+
+ ' ENEMY
+ VAR born_wait=0
+ VAR born_wait_max=30
+ VAR enemy_max=9
+ DIM ex[enemy_max], ey[enemy_max]
+ DIM e_spd[enemy_max],e_wait[enemy_max],e_attack_wait[enemy_max]
+ VAR ex_outer=10
+ VAR ex_max=30+ex_outer*2
+ VAR e_wait_max=8
+ VAR e_attack_wait_max=120
+
+ ' ENEMY WEAPON
+ VAR e_weapon_max=enemy_max
+ VAR e_weapon_num=0
+ VAR e_weapon_count=0
+ DIM e_wx[e_weapon_max], e_wy[e_weapon_max]
+ VAR e_wy_min=2
+ DIM e_w_wait[e_weapon_max]
+ VAR e_w_wait_max=6
+
+ ' EFFECT
+ VAR ef_x,ef_y,ef_wait
+ VAR ef_wait_max=4
+
+ GOSUB @INIT_GAME
+
+@RESTART
+ GOSUB @INIT_RESTART
+
+ CLS
+ GOSUB @INFO_DISP
+ VSYNC 1
+ GOSUB @DISP_BG2
+ VSYNC 1
+ GOSUB @PLAYER_DISP
+ VSYNC 60
+
+'---------
+' MAIN
+@MAIN_LOOP
+
+ GOSUB @PLAYER_INPUT
+ GOSUB @PLAYER_DISP
+ GOSUB @WEAPON
+ GOSUB @ENEMY_BORN
+ GOSUB @ENEMY
+ GOSUB @ENEMY_ATTACK
+ GOSUB @ENEMY_WEAPON
+ GOSUB @WEAPON_CHECK
+ GOSUB @PLAYER_CHECK
+ GOSUB @EFFECT
+ GOSUB @INFO_UPDATE
+
+ VSYNC game_wait
+
+ IF player_dead==FALSE THEN GOTO @MAIN_LOOP
+ VSYNC 60
+
+ player_num=player_num-1
+ IF player_num>0 THEN  GOTO @RESTART
+
+'---------
+@RESULT
+ IF hi_score<score THEN hi_score=score
+ LOCATE 32,2
+ PRINT STR$(hi_score)
+ LOCATE 10,8
+ PRINT "           "
+ LOCATE 10,9
+ PRINT " GAME OVER "
+ LOCATE 10,10
+ PRINT "           "
+ VSYNC 60
+ WHILE 1
+  LOCATE 9,11
+  PRINT " HIT ANY KEY "
+  LOCATE 9,12
+  PRINT "             "
+  ' KEYBOARD or JOYPAD BUTTON
+  'c$=INKEY$()
+  FOR i=0 TO game_wait-1
+   C$=INKEY$()
+  NEXT
+  b=BUTTON()
+  b=BUTTON()
+  IF b AND (1<<#EMUJOY_1) THEN c$="E"
+  IF b AND (1<<#EMUJOY_2) THEN c$="N"
+  IF b AND (1<<#EMUJOY_3) THEN c$="H"
+  IF c$!="" THEN BREAK
+  VSYNC 1
+ WEND
+ BEEP 1
+ VSYNC 60
+RETURN
+
+
+'-------------------
+' PLAYER
+@PLAYER_INPUT
+ c$=INKEY$()
+ b=BUTTON()
+ 'IF c$==CHR$(30) THEN b=b OR 1
+ 'IF c$==CHR$(31) THEN b=b OR 2
+ 'IF c$==CHR$(29) THEN b=b OR (1<<#EMUJOY_LEFT)
+ 'IF c$==CHR$(28) THEN b=b OR (1<<#EMUJOY_RIGHT)
+ 'IF b AND (1<<#EMUJOY_UP)    THEN c$="E"
+ 'IF b AND (1<<#EMUJOY_DOWN)  THEN c$="X"
+ IF b AND (1<<#EMUJOY_LEFT)  THEN c$="Z"
+ IF b AND (1<<#EMUJOY_RIGHT) THEN c$="C"
+ IF b AND (1<<#EMUJOY_1)     THEN c$=","
+ IF b AND (1<<#EMUJOY_2)     THEN c$="/"
+ lx=STICK(#STICK_LX)
+ 'ly=STICK(#STICK_LY
+ IF lx<(-32768*0.2) THEN c$="Z"
+ IF lx>( 32768*0.2) THEN c$="C"
+
+ ' PLAYER_MOVE
+ IF (c$=="z")OR(c$=="Z") THEN px=px-1
+ IF (c$=="c")OR(c$=="C") THEN px=px+1
+ IF px < px_min THEN px=px_min
+ IF px > px_max THEN px=px_max
+ ' DEBUG
+ 'LOCATE 0,0
+ 'PRINT STR$(px)
+
+ ' PLAYER_ATTACK
+ GOSUB @PLAYER_ATTACK
+RETURN
+
+@PLAYER_ATTACK
+ VAR ax,ay
+ IF attack_wait>0 THEN
+  attack_wait=attack_wait-1
+ ELSEIF (c$==",")OR(c$=="/") THEN
+  IF c$=="," THEN ax=px-2
+  IF c$=="/" THEN ax=px+2
+
+  FOR i=0 TO weapon_max-1
+   PLAYER_ATTACK_ONE wx[i],wy[i],w_wait[i] OUT wx[i],wy[i],w_wait[i]
+   IF attack_wait>0 THEN RETURN
+  NEXT
+ ENDIF
+RETURN
+
+DEF PLAYER_ATTACK_ONE wx_i,wy_i,w_wait_i OUT wx0,wy0,w_wait0
+ wx0 = wx_i
+ wy0 = wy_i
+ w_wait0 = w_wait_i
+ IF wy0<0 THEN
+  wx0=ax
+  wy0=3
+  w_wait0=0
+  LOCATE wx0,wy0
+  PRINT "ェ"
+  attack_wait=attack_wait_max
+  BEEP 4
+ ENDIF
+END
+
+@PLAYER_DISP
+ LOCATE px-3,py
+ PRINT "  "
+ LOCATE px-3,py+1
+ PRINT "  "
+RETURN
+
+@PLAYER_CHECK
+ FOR i=0 TO e_weapon_max-1
+  player_dead=PLAYER_CHECK_ONE(px,py,e_wx[i],e_wy[i])
+  IF player_dead==TRUE THEN BREAK
+ NEXT
+
+ IF player_dead==TRUE THEN
+  LOCATE px-3,py
+  PRINT "  ***  "
+  LOCATE px-3,py+1
+  PRINT " ***** "
+  BEEP 5
+ ENDIF
+RETURN
+
+DEF PLAYER_CHECK_ONE(px_i,py_i,e_wx_i,e_wy_i)
+ VAR px=px_i
+ VAR py=py_i
+ VAR e_wx0=e_wx_i
+ VAR e_wy0=e_wy_i
+ ' DEBUG
+ 'LOCATE 0,25
+ 'PRINT "PLAYER_CHECK",px,py,e_wx0,e_wy0
+ IF e_wy0<0 THEN RETURN FALSE
+ IF (px>=e_wx0-2) AND (px<=e_wx0+2) THEN
+  IF (e_wy0>=2) AND (e_wy0<=3) THEN
+   RETURN TRUE
+  ENDIF
+ ENDIF
+ RETURN FALSE
+END
+
+
+'-------------------
+' WEAPON
+@WEAPON
+ FOR i=0 TO weapon_max-1
+  WEAPON_MOVE_ONE wx[i],wy[i],w_wait[i] OUT wx[i],wy[i],w_wait[i]
+ NEXT
+ RETURN
+RETURN
+
+DEF WEAPON_MOVE_ONE wx_i,wy_i,w_wait_i OUT wx0,wy0,w_wait0
+ wx0 = wx_i
+ wy0 = wy_i
+ w_wait0 = w_wait_i
+ IF wx0>0 THEN
+  w_wait0=w_wait0+1
+  IF wy0>=wy_max THEN
+   LOCATE wx0,wy0
+   PRINT " "
+   wx0=-1
+   wy0=-1
+   w_wait0=0
+   'BEEP 0
+  ENDIF
+  IF w_wait0 >= w_wait_max THEN
+   w_wait0=0
+   LOCATE wx0,wy0
+   IF wy0==3 THEN
+    PRINT "-"
+   ELSE
+    PRINT " "
+   ENDIF
+   wy0=wy0+1
+   LOCATE wx0,wy0
+   IF wy0==wy_max THEN
+    PRINT "γ"
+   ELSE
+    PRINT "ェ"
+   ENDIF
+   'BEEP 1
+  ENDIF
+ ENDIF
+END
+
+@WEAPON_CHECK
+ FOR i=0 TO weapon_max-1
+  WEAPON_CHECK_ONE0 wx[i],wy[i],w_wait[i] OUT wx[i],wy[i],w_wait[i]
+  ' DEBUG
+  'x=wx[i]:y=wy[i]:w=w_wait[i]
+  'WEAPON_CHECK_ONE0 x,y,w OUT x,y,w
+  'PRINT i
+  'wx[i]=x:wy[i]=y:w_wait[i]=w
+ NEXT
+RETURN
+
+DEF WEAPON_CHECK_ONE0 wx_i,wy_i,w_wait_i OUT wx0,wy0,w_wait0
+ VAR i
+ wx0=wx_i
+ wy0=wy_i
+ w_wait0=w_wait_i
+ FOR i=0 TO enemy_max-1
+  WEAPON_CHECK_ONE wx0,wy0,w_wait0,ex[i],ey[i],e_spd[i],e_wait[i] OUT wx0,wy0,w_wait0,ex[i],e_spd[i],e_wait[i]
+ NEXT
+END
+
+DEF WEAPON_CHECK_ONE wx_i,wy_i,w_wait_i,ex_i,ey_i,e_spd_i,e_wait_i OUT wx0,wy0,w_wait0,ex0,e_spd0,e_wait0
+ wx0=wx_i
+ wy0=wy_i
+ w_wait0=w_wait_i
+ ex0=ex_i
+ VAR ey0=ey_i
+ e_spd0=e_spd_i
+ e_wait0=e_wait_i
+ ' DEBUG
+ 'LOCATE 0,25
+ 'PRINT "W_C",wx0,wy0,ex0,ey0
+ IF (wx0<0) OR (wy0<0) THEN RETURN
+ IF ex0<0 THEN RETURN
+ VAR temp_ex0
+ IF SGN(e_spd0)>0 THEN
+  temp_ex0=ex0
+ ELSE
+  temp_ex0=ex0-1
+ ENDIF
+ IF (wx0>=temp_ex0-ex_outer-2) AND (wx0<=temp_ex0-ex_outer+2) THEN
+  IF wy0==ey0 THEN
+   'LOCATE wx0,wy0
+   'PRINT " "
+   x=ex0-ex_outer-3
+   IF x<1 THEN x=1
+   IF x>30-6 THEN x=30-6
+   LOCATE x,ey0
+   PRINT "      "
+   IF ef_x<0 THEN
+    ef_x=wx0
+    ef_y=wy0
+    ef_wait=ef_wait_max
+   ENDIF
+   wx0=-1
+   wy0=-1
+   w_wait0=0
+   ex0=-1
+   e_spd0=0
+   e_wait0=0
+   score=score+score_add
+   BEEP 3
+  ENDIF
+ ENDIF
+END
+
+
+'-------------------
+' ENEMY
+@ENEMY_BORN
+ VAR bx,b_spd
+ IF born_wait>0 THEN
+  born_wait=born_wait-1
+ ELSE
+  r=RND(4)
+  IF r>=3 THEN
+   b_spd=2
+  ELSEIF r>=2 THEN
+   b_spd=1
+  ELSEIF r>=1 THEN
+   b_spd=-1
+  ELSE
+   b_spd=-2
+  ENDIF
+
+  FOR i=enemy_max-1 TO 0 STEP -1
+   IF (i==2) OR (i==3) THEN
+    IF (game_rank<1) OR (score<20) THEN
+     CONTINUE
+    ENDIF
+   ENDIF
+   IF (i==0) OR (i==1) THEN
+    IF (game_rank<2) OR (score<40)  THEN
+     CONTINUE
+    ENDIF
+   ENDIF
+   ENEMY_BORN_ONE ex[i],e_spd[i],e_wait[i] OUT ex[i],e_spd[i],e_wait[i]
+   IF born_wait>0 THEN RETURN
+  NEXT
+ ENDIF
+RETURN
+
+DEF ENEMY_BORN_ONE ex_i,e_spd_i,e_wait_i OUT ex0,e_spd0,e_wait0
+ ex0=ex_i
+ e_spd0=e_spd_i
+ e_wait0=e_wait_i
+ IF ex0<0 THEN
+  IF b_spd<0 THEN ex0=ex_max-1
+  IF b_spd>0 THEN ex0=0
+  e_spd0=b_spd
+  e_wait0=0
+  born_wait=born_wait_max
+ ENDIF
+END
+
+'-------------------
+@ENEMY
+ ' ENEMY MOVE
+ FOR i=0 TO enemy_max-1
+  ENEMY_MOVE_ONE ex[i],e_spd[i],e_wait[i] OUT ex[i],e_spd[i],e_wait[i]
+ NEXT
+ ' ENEMY DISP
+ FOR i=0 TO enemy_max-1
+  ENEMY_DISP_ONE ex[i],ey[i],e_spd[i],e_wait[i]
+ NEXT
+RETURN
+
+
+DEF ENEMY_MOVE_ONE ex_i,e_spd_i,e_wait_i OUT ex0,e_spd0,e_wait0
+ ex0 = ex_i
+ e_spd0 = e_spd_i
+ e_wait0 = e_wait_i
+ IF (ex0>=0) AND (ex0<ex_max) THEN
+  e_wait0=e_wait0+1
+  IF e_wait0 >= e_wait_max/ABS(e_spd0) THEN
+   e_wait0=0
+   ex0=ex0+SGN(e_spd0)
+   IF (ex0<0) OR (ex0>=ex_max) THEN
+    ex0=-1
+    e_spd0=0
+    e_wait0=0
+   ENDIF
+  ENDIF
+ ENDIF
+END
+
+DEF ENEMY_DISP_ONE ex_i,ey_i,e_spd_i,e_wait_i
+ VAR ex0 = ex_i
+ VAR ey0 = ey_i
+ VAR e_spd0 = e_spd_i
+ VAR e_wait0 = e_wait_i
+ IF e_wait0==0 THEN
+
+  IF SGN(e_spd0)>0 THEN
+   IF (ex0>=ex_outer+4) AND (ex0<=ex_max-(ex_outer+3)) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT " <(X)>"
+   ENDIF
+   IF ex0==ex_outer-1 THEN
+    LOCATE 1,ey0
+    PRINT ">"
+   ELSEIF ex0==ex_outer THEN
+    LOCATE 1,ey0
+    PRINT ")>"
+   ELSEIF ex0==ex_outer+1 THEN
+    LOCATE 1,ey0
+    PRINT "X)>"
+   ELSEIF ex0==ex_outer+2 THEN
+    LOCATE 1,ey0
+    PRINT "(X)>"
+   ELSEIF ex0==ex_outer+3 THEN
+    LOCATE 1,ey0
+    PRINT "<(X)>"
+   ENDIF
+   IF ex0==ex_max-(ex_outer+2) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT " <(X)"
+   ELSEIF ex0==ex_max-(ex_outer+1) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT " <(X"
+   ELSEIF ex0==ex_max-(ex_outer) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT " <("
+   ELSEIF ex0==ex_max-(ex_outer-1) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT " <"
+   ELSEIF ex0==ex_max-(ex_outer-2) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT " "
+   ENDIF
+
+  ELSE
+   IF (ex0>=ex_outer+4) AND (ex0<=ex_max-(ex_outer+3)) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT "<(X)> "
+   ENDIF
+   IF ex0==ex_outer-1 THEN
+    LOCATE 1,ey0
+    PRINT " "
+   ELSEIF ex0==ex_outer THEN
+    LOCATE 1,ey0
+    PRINT "> "
+   ELSEIF ex0==ex_outer+1 THEN
+    LOCATE 1,ey0
+    PRINT ")> "
+   ELSEIF ex0==ex_outer+2 THEN
+    LOCATE 1,ey0
+    PRINT "X)> "
+   ELSEIF ex0==ex_outer+3 THEN
+    LOCATE 1,ey0
+    PRINT "(X)> "
+   ENDIF
+   IF ex0==ex_max-(ex_outer+2) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT "<(X)>"
+   ELSEIF ex0==ex_max-(ex_outer+1) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT "<(X)"
+   ELSEIF ex0==ex_max-(ex_outer) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT "<(X"
+   ELSEIF ex0==ex_max-(ex_outer-1) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT "<("
+   ELSEIF ex0==ex_max-(ex_outer-2) THEN
+    LOCATE ex0-(ex_outer+3),ey0
+    PRINT "<"
+   ENDIF
+  ENDIF
+
+  ' MAP
+  LOCATE 31,15+((ey0-6)/2)
+  IF ex0<0 THEN
+   PRINT "|  X  |"
+  ELSEIF ex0<ex_outer/2 THEN
+   PRINT "|． X  |"
+  ELSEIF ex0<ex_outer-1 THEN
+   PRINT "| ．X  |"
+  ELSEIF ex0>ex_max-(ex_outer/2) THEN
+   PRINT "|  X ．|"
+  ELSEIF ex0>ex_max-(ex_outer-2) THEN
+   PRINT "|  X． |"
+  ELSE
+   PRINT "|  X  |"
+  ENDIF
+ ENDIF
+
+END
+
+'-------------------
+' ENEMY ATTACK
+@ENEMY_ATTACK
+ FOR i=0 TO enemy_max-1
+  ENEMY_ATTACK_CHECK ex[i],e_attack_wait[i] OUT e_attack_wait[i],flag
+  IF flag==TRUE THEN
+   ENEMY_ATTACK_ONE ex[i],ey[i],e_wx[i],e_wy[i],e_w_wait[i] OUT e_wx[i],e_wy[i],e_w_wait[i]
+  ENDIF
+ NEXT
+RETURN
+
+
+DEF ENEMY_ATTACK_CHECK ex_i,e_attack_wait_i OUT e_attack_wait0,flag
+ VAR ex0=ex_i
+ e_attack_wait0=e_attack_wait_i
+ flag=FALSE
+ IF (ex0>ex_outer) AND (ex0<ex_max-ex_outer) THEN
+  IF e_attack_wait0>0 THEN
+   e_attack_wait0=e_attack_wait0-1
+  ELSE
+   'ENEMY_ATTACK_ONE ex0,ey0,e_wx00,e_wy00,e_w_wait00 OUT e_wx00,e_wy00,e_w_wait00
+   flag=TRUE
+   e_attack_wait0=e_attack_wait_max/2+RND(e_attack_wait_max/2)
+  ENDIF
+ ENDIF
+END
+
+DEF ENEMY_ATTACK_ONE ex_i,ey_i,wx_i,wy_i,w_wait_i OUT wx0,wy0,w_wait0
+ wx0 = wx_i
+ wy0 = wy_i
+ w_wait0 = w_wait_i
+ IF wy0<0 THEN
+  wx0=ex_i-ex_outer
+  wy0=ey_i-1
+  w_wait0=0
+  LOCATE wx0,wy0
+  PRINT "+"
+  attack_wait=attack_wait_max
+  BEEP 4
+ ENDIF
+END
+
+'-------------------
+' ENEMY WEAPON
+@ENEMY_WEAPON
+ FOR i=0 TO e_weapon_max-1
+  ENEMY_WEAPON_MOVE_ONE e_wx[i],e_wy[i],e_w_wait[i] OUT e_wx[i],e_wy[i],e_w_wait[i]
+ NEXT
+RETURN
+
+DEF ENEMY_WEAPON_MOVE_ONE e_wx_i,e_wy_i,e_w_wait_i OUT e_wx0,e_wy0,e_w_wait0
+ e_wx0 = e_wx_i
+ e_wy0 = e_wy_i
+ e_w_wait0 = e_w_wait_i
+ IF e_wx0>0 THEN
+  e_w_wait0=e_w_wait0+1
+  IF e_wy0<=e_wy_min THEN
+   LOCATE e_wx0,e_wy0
+   PRINT " "
+   e_wx0=-1
+   e_wy0=-1
+   e_w_wait0=0
+   'BEEP 0
+  ENDIF
+  IF e_w_wait0 >= e_w_wait_max THEN
+   e_w_wait0=0
+   LOCATE e_wx0,e_wy0
+   IF e_wy0==3 THEN
+    PRINT "-"
+   ELSE
+    PRINT " "
+   ENDIF
+   e_wy0=e_wy0-1
+   LOCATE e_wx0,e_wy0
+   IF e_wy0==e_wy_min THEN
+    PRINT "γ"
+   ELSE
+    PRINT "+"
+   ENDIF
+   'BEEP 1
+  ENDIF
+ ENDIF
+END
+
+'-------------------
+' EFFECT
+@EFFECT
+ IF ef_wait<=0 THEN RETURN
+ ef_wait=ef_wait-1
+ IF ef_wait<=0 THEN
+  LOCATE ef_x-1,ef_y
+  PRINT "   "
+  ef_x=-1
+  ef_y=-1
+  ef_wait=0
+  RETURN
+ ENDIF
+ IF ef_x>0 THEN
+  LOCATE ef_x-1,ef_y
+  PRINT "***"
+ ENDIF
+RETURN
+
+'-------------------
+' INIT_GAME
+@INIT_GAME
+ score=0
+ player_num=player_num_max
+ player_dead=FALSE
+ IF game_rank==0 THEN
+  score_add=1
+  e_wait_max=14
+  born_wait_max=40
+  e_attack_wait_max=120
+  e_w_wait_max=6
+ ELSEIF game_rank==1 THEN
+  score_add=2
+  e_wait_max=10
+  born_wait_max=30
+  e_attack_wait_max=90
+  e_w_wait_max=6
+ ELSEIF game_rank==2 THEN
+  score_add=4
+  e_wait_max=6
+  born_wait_max=20
+  e_attack_wait_max=60
+  e_w_wait_max=5
+ ENDIF
+RETURN
+
+@INIT_RESTART
+ px=30/2
+ FOR i=0 TO weapon_max-1
+  wx[i]=-1:wy[i]=-1:w_wait[i]=0
+ NEXT
+ born_wait=born_wait_max
+ FOR i=0 TO enemy_max-1
+  ex[i]=-1
+  ey[i]=i*2+6
+  e_spd[i]=0
+  e_wait[i]=0
+  e_attack_wait[i]=RND(e_attack_wait_max)
+ NEXT
+ FOR i=0 TO e_weapon_max-1
+  e_wx[i]=-1
+  e_wy[i]=-1
+  e_w_wait[i]=0
+ NEXT
+ ef_x=-1:ef_y=-1:ef_wait=0
+RETURN
+
+'-------------------
+' INFO
+@INFO_DISP
+ LOCATE 31,1
+ PRINT " HI SCORE"
+ LOCATE 32,2
+ PRINT STR$(hi_score)
+ LOCATE 32,4
+ PRINT "SCORE"
+ LOCATE 32,5
+ PRINT STR$(score)
+ LOCATE 32,7
+ IF game_rank==0 THEN
+  PRINT "EASY"
+ ELSEIF game_rank==1 THEN
+  PRINT "NORMAL"
+ ELSEIF game_rank==2 THEN
+  PRINT "HARD"
+ ENDIF
+ LOCATE 32,10
+ PRINT "ェェェェ"
+ LOCATE 32,12
+ IF player_num>=5 THEN
+  PRINT ""
+ ELSEIF player_num==4 THEN
+  PRINT "　"
+ ELSEIF player_num==3 THEN
+  PRINT "　　"
+ ELSEIF player_num==2 THEN
+  PRINT "　　　"
+ ELSEIF player_num==1 THEN
+  PRINT "　　　　"
+ ENDIF
+RETURN
+
+@INFO_UPDATE
+ LOCATE 32,5
+ PRINT STR$(score)
+ weapon_count=0
+ FOR i=0 TO weapon_max-1
+  IF wy[i]<0 THEN weapon_count=weapon_count+1
+ NEXT
+ IF weapon_num == weapon_count THEN
+  RETURN
+ ELSE
+  weapon_num = weapon_count
+ ENDIF
+ LOCATE 32,10
+ IF weapon_num==4 THEN PRINT "ェェェェ"
+ IF weapon_num==3 THEN PRINT "ェェェ "
+ IF weapon_num==2 THEN PRINT "ェェ  "
+ IF weapon_num==1 THEN PRINT "ェ   "
+ IF weapon_num==0 THEN PRINT "    "
+RETURN
+
+'-------------------
+@DISP_BG
+ FOR i=0 TO 22
+  LOCATE 0,i
+  PRINT ""
+  LOCATE 30,i
+  PRINT ""
+ NEXT
+ LOCATE 0,22
+ PRINT ""
+RETURN
+
+@DISP_BG2
+ LOCATE 0,0
+ PRINT "                             "
+ LOCATE 0,1
+ PRINT "                             "
+ LOCATE 0,2
+ PRINT "                             "
+ LOCATE 0,3
+ PRINT "-----------------------------"
+ LOCATE 0,4
+ PRINT "                             "
+ LOCATE 0,5
+ PRINT "                             "
+ LOCATE 0,6
+ PRINT "                             "
+ LOCATE 0,7
+ PRINT "                             "
+ LOCATE 0,8
+ PRINT "                             "
+ LOCATE 0,9
+ PRINT "                             "
+ LOCATE 0,10
+ PRINT "                             "
+ LOCATE 0,11
+ PRINT "                             "
+ LOCATE 0,12
+ PRINT "                             "
+ LOCATE 0,13
+ PRINT "                             "
+ LOCATE 0,14
+ PRINT "                             +-----+"
+ LOCATE 0,15
+ PRINT "                             |  X  |"
+ LOCATE 0,16
+ PRINT "                             |  X  |"
+ LOCATE 0,17
+ PRINT "                             |  X  |"
+ LOCATE 0,18
+ PRINT "                             |  X  |"
+ LOCATE 0,19
+ PRINT "                             |  X  |"
+ LOCATE 0,20
+ PRINT "                             |  X  |"
+ LOCATE 0,21
+ PRINT "                             |  X  |"
+ LOCATE 0,22
+ PRINT "                             |  X  |"
+ LOCATE 0,23
+ PRINT "                             |  X  |"
+ LOCATE 0,24
+ PRINT "+-----+"
+RETURN
+
+
+'=======================================
+
+'-------------------
+' TITLE
+@TITLE_SCENE
+ CLS
+ LOCATE 5,2
+ PRINT "*******************"
+ LOCATE 5,3
+ PRINT "*　センスイカンケ゛ーム　モト゛キ　*"
+ LOCATE 5,4
+ PRINT "*******************"
+ LOCATE 7,6
+ PRINT ""
+ LOCATE 7,7
+ PRINT "　SHIP"
+ LOCATE 7,9
+ PRINT "<(X)>　SUBMARINE"
+ LOCATE 7,11
+ PRINT "*フネ　ミキ゛　　[C]"
+ LOCATE 7,12
+ PRINT "*フネ　ヒタ゛リ　[Z]"
+ LOCATE 7,14
+ PRINT "*ハ゛クライ　ミキ゛　　[,]"
+ LOCATE 7,15
+ PRINT "*ハ゛クライ　ヒタ゛リ　[/]"
+ LOCATE 7,17
+ PRINT "<PUSH KEY>"
+ LOCATE 7,18
+ PRINT "*EASY　　　...E"
+ LOCATE 7,19
+ PRINT "*NORMAL　...N"
+ LOCATE 7,20
+ PRINT "*HARD　　　...H"
+ LOCATE 7,22
+ PRINT "HI SCORE "+STR$(hi_score)
+ 'LOCATE 7,23
+ 'PRINT "SCORE    "+STR$(score)
+ WHILE 1
+  ' KEYBOARD or JOYPAD BUTTON
+  c$=INKEY$()
+  b=BUTTON()
+  IF b AND (1<<#EMUJOY_1) THEN c$="E"
+  IF b AND (1<<#EMUJOY_2) THEN c$="N"
+  IF b AND (1<<#EMUJOY_3) THEN c$="H"
+  IF (c$=="e")OR(c$=="E") THEN
+   game_rank=0
+   BREAK
+  ELSEIF (c$=="n")OR(c$=="N") THEN
+   game_rank=1
+   BREAK
+  ELSEIF (c$=="h")OR(c$=="H") THEN
+   game_rank=2
+   BREAK
+  ENDIF
+  VSYNC 1
+ WEND
+
+ BEEP 1
+ VSYNC 60
+RETURN
+
+
+'=======================================
+
+'-------------------
+' SB_INIT
+@SB_INIT
+ ACLS
+ CLS
+ VISIBLE 1,0,0
+ XSCREEN 320,240,4/3
+RETURN
+
