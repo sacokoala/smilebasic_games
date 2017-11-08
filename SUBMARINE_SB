@@ -147,11 +147,7 @@ PRINT "PROGRAM END"
   LOCATE 9,12
   PRINT "             "
   ' KEYBOARD or JOYPAD BUTTON
-  'c$=INKEY$()
-  FOR i=0 TO game_wait-1
-   C$=INKEY$()
-  NEXT
-  b=BUTTON()
+  c$=INKEY$()
   b=BUTTON()
   IF b AND (1<<#EMUJOY_1) THEN c$="E"
   IF b AND (1<<#EMUJOY_2) THEN c$="N"
