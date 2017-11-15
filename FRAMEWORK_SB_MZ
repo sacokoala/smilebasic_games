@@ -1,0 +1,651 @@
+'=======================================
+' Framework for SmileBASIC and MZ-80C
+' 2017/11/16 sacokoala
+'=======================================
+
+'-------------------
+' GLOBAL VARIABLE
+
+' 0=SmileBASIC 1=MZ-80C 2=both
+VAR mz_mode=0
+' MZ-80C 40*25 CONSOLE
+VAR mz_console_x_max=40
+VAR mz_console_y_max=25
+VAR mz_console_addr=&HD000
+VAR mz_buff_r_ptr=0
+VAR mz_buff_w_ptr=0
+VAR mz_buff_max=256
+DIM mz_buff_addr[mz_buff_max]
+DIM mz_buff_chr[mz_console_x_max*mz_buff_max]
+
+'VAR score_1P=0
+'VAR score_2P=0
+VAR score=0
+VAR hi_score=0
+
+' SELECT_SB_MZ
+SELECT_SB_MZ
+
+' INIT
+SB_INIT
+MZ_INIT
+
+'-------------------
+' SCENE LOOP
+@SCENE_TOP
+
+' DEBUG
+DEBUG_SCENE
+DEBUG_SCENE2
+
+' TITLE
+GOSUB @TITLE_SCENE
+
+' GAME
+GOSUB @GAME_SCENE
+
+' RESULT
+GOSUB @RESULT_SCENE
+
+GOTO @SCENE_TOP
+'-------------------
+
+' END FUNC
+EMUWINDOW 0
+PRINT "PROGRAM END"
+
+
+'=======================================
+
+'-------------------
+' GAME
+@GAME_SCENE
+ CLS_MZ
+ LOCATE_MZ 15,9
+ PRINT_MZ "GAME MAIN"
+ UPDATE_MZ
+ VSYNC 60
+RETURN
+
+
+'=======================================
+
+'-------------------
+' TITLE
+@TITLE_SCENE
+ CLS_MZ
+ LOCATE_MZ 14,10
+ PRINT_MZ "DUMMY TITLE"
+ 'LOCATE_MZ 10,20
+ 'PRINT_MZ "PUSH ENY KEY"
+ UPDATE_MZ
+ VSYNC 60
+RETURN
+
+'-------------------
+' RESULT
+@RESULT_SCENE
+ CLS_MZ
+ LOCATE_MZ 15,10
+ PRINT_MZ "GAME OVER"
+ UPDATE_MZ
+ VSYNC 60
+RETURN
+
+
+'=======================================
+
+'-------------------
+' DEBUG
+DEF DEBUG_SCENE
+ CLS_MZ
+ LOCATE_MZ 0,2
+ PRINT_MZ "PRINT TEST (DEBUG)"
+ COLOR_MZ #RED
+ LOCATE_MZ 0,4
+ PRINT_MZ "ABCDEFG HIJKLMN OPQRSTU VWXYZ"
+ COLOR_MZ #BLUE
+ LOCATE_MZ 0,5
+ PRINT_MZ "abcdefg hijklmn opqrstu vwxyz"
+ COLOR_MZ #YELLOW
+ LOCATE_MZ 0,6
+ PRINT_MZ "0123456789"
+ COLOR_MZ #GREEN
+ LOCATE_MZ 0,7
+ PRINT_MZ "!#$%&'()"
+ COLOR_MZ #FUCHSIA
+ LOCATE_MZ 0,8
+ PRINT_MZ "*+,-./:;"
+ COLOR_MZ #MAGENTA
+ LOCATE_MZ 0,9
+ PRINT_MZ "<=>?@[\]|="
+ COLOR_MZ #CYAN
+ LOCATE_MZ 0,10
+ PRINT_MZ "チコソシイハキクニマノリモミラ"
+ COLOR_MZ #AQUA
+ LOCATE_MZ 0,11
+ PRINT_MZ "セタストカナヒテサンツロケ「ァャ"
+ COLOR_MZ #PURPLE
+ LOCATE_MZ 0,12
+ PRINT_MZ "ワヌフアウエオヤユヨホヘレメルネ"
+ COLOR_MZ #LIME
+ LOCATE_MZ 0,13
+ PRINT_MZ "ム」ィュヲ、ゥョ゜．ェッ゛。ォー"
+ COLOR_MZ #SILVER
+ LOCATE_MZ 0,14
+ PRINT_MZ "♠♦←♣●？：↑＜[♥]＠＞"
+ COLOR2_MZ #NAVY,#GRAY
+ LOCATE_MZ 0,15
+ PRINT_MZ ""
+ COLOR2_MZ #WHITE,#BLACK
+ LOCATE_MZ 0,16
+ PRINT_MZ "日月火水木金土生年時分秒円\£"
+ LOCATE_MZ 0,17
+ PRINT_MZ ""
+ LOCATE_MZ 0,18
+ PRINT_MZ ""
+ UPDATE_MZ
+ VSYNC 180
+END
+
+'-------------------
+' DEBUG
+DEF DEBUG_SCENE2
+ VAR y
+ CLS_MZ
+ FOR y=0 TO mz_console_y_max-1
+  LOCATE_MZ 0,y
+  PRINT_MZ "HELLO WORLD."+STR$(y)
+ NEXT
+ UPDATE_MZ
+ VSYNC 180
+END
+
+'-------------------
+' SELECT_SB_MZ
+DEF SELECT_SB_MZ
+ VAR sel$
+ ACLS
+ VISIBLE 1,0,0
+ mz_mode=-1
+ WHILE mz_mode==-1
+  VSYNC 1
+  CLS
+  'PRINT "Select game mode.(0:SmileBasic 1:MZ-80C)"
+  'sel$=INKEY$()
+  LOCATE 2,2
+  INPUT"Select game mode.(0:SmileBasic 1:MZ-80C 2:both)";sel$
+  IF sel$=="0" THEN
+   mz_mode=0
+  ELSEIF sel$=="1" THEN
+   mz_mode=1
+  ELSEIF sel$=="2" THEN
+   mz_mode=2
+  ELSE
+   mz_mode=-1
+  ENDIF
+ WEND
+END
+
+'-------------------
+' SB_INIT
+DEF SB_INIT
+ ACLS
+ CLS
+ VISIBLE 1,0,0
+ IF mz_mode>=1 THEN
+  XSCREEN 640,360,16/9
+ ELSE
+  XSCREEN 320,240,4/3
+ ENDIF
+END
+
+'-------------------
+' MZ_INIT
+DEF MZ_INIT
+ IF mz_mode>=1 THEN
+  ' MZ-80C RESET
+  EMURESET
+  ' MZ-80C 320*200 (40*25 CONSOLE)
+  IF mz_mode==1 THEN
+   'EMUWINDOW 960,0,320,200
+   'EMUWINDOW 640,0,640,400
+   EMUWINDOW 320,0,960,600
+   'EMUWINDOW 5
+   ' CURSOR OFF
+   'mem_e000=EMUMEM(&HE000)
+   'EMUMEM &HE000, mem_e000 OR &H80
+   PRINT " "
+   PRINT "MZ-80C CLOSE COMMAND"
+   PRINT " "
+   PRINT "[EMUWINDOW 0]"
+   PRINT "  OR"
+   PRINT "[ACLS]"
+   PRINT " "
+  ELSEIF mz_mode==2 THEN
+   EMUWINDOW 640,0,640,400
+  ENDIF
+  VSYNC 180
+ ELSE
+  EMUWINDOW 0
+ ENDIF
+
+END
+
+
+'=======================================
+
+'-------------------
+' UPDATE_MZ
+DEF UPDATE_MZ
+ VAR i,j
+ IF mz_mode==0 OR mz_mode==2 THEN
+  ' SmileBASIC NO UPDATE
+ ENDIF
+ IF mz_mode>=1 THEN
+  FOR j=0 TO mz_buff_max-1
+   IF mz_buff_r_ptr==mz_buff_w_ptr THEN BREAK
+   FOR i=0 TO mz_console_x_max-1
+    ' DEBUG
+    'PRINT "i    &H";HEX$(i)
+    'PRINT "addr &H";HEX$(mz_buff_addr[mz_buff_r_ptr]+i)
+    'PRINT "chr  &H";HEX$(mz_buff_chr[mz_console_x_max*mz_buff_r_ptr+i])
+    IF mz_buff_chr[mz_console_x_max*mz_buff_r_ptr+i]==-1 THEN BREAK
+    EMUMEM mz_buff_addr[mz_buff_r_ptr]+i, mz_buff_chr[mz_console_x_max*mz_buff_r_ptr+i]
+   NEXT
+   mz_buff_r_ptr=mz_buff_r_ptr+1
+   IF mz_buff_r_ptr>=mz_buff_max THEN mz_buff_r_ptr=0
+  NEXT
+ ENDIF
+END
+
+'-------------------
+' CLS_MZ
+DEF CLS_MZ
+ VAR i
+ IF mz_mode==0 OR mz_mode==2 THEN
+  CLS
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C 40*25 CONSOLE
+  FOR i=0 TO mz_console_x_max*mz_console_y_max-1
+   EMUMEM &HD000+i, 0
+  NEXT
+ ENDIF
+END
+
+'-------------------
+' COLOR_MZ
+DEF COLOR_MZ col
+ IF mz_mode==0 OR mz_mode==2 THEN
+  COLOR2_MZ col,#BLACK
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C NO COLOR (ALL GREEN)
+ ENDIF
+END
+DEF COLOR2_MZ col,col2
+ IF mz_mode==0 OR mz_mode==2 THEN
+  COLOR col,col2
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C NO COLOR (ALL GREEN)
+ ENDIF
+END
+
+'-------------------
+' LOCATE_MZ
+DEF LOCATE_MZ x,y
+ ' DEBUG
+ IF (x<0)OR(x>=mz_console_x_max) THEN
+  PRINT "LOCATE_MZ ERROR x=";x
+ ENDIF
+ IF (y<0)OR(y>=mz_console_y_max) THEN
+  PRINT "LOCATE_MZ ERROR y=";y
+ ENDIF
+ IF mz_mode==0 OR mz_mode==2 THEN
+  LOCATE x,y
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C 40*25 CONSOLE
+  'mz_console_addr = &HD000 + (x + mz_console_x_max*y)
+  DIM addr[1]
+  addr[0]=&HD000 + (x + mz_console_x_max*y)
+  COPY mz_buff_addr,mz_buff_w_ptr,addr
+  ' DEBUG
+  'PRINT "w_ptr &H";HEX$(mz_buff_w_ptr)
+  'PRINT "buff  &H";HEX$(mz_buff_addr[mz_buff_w_ptr])
+  'mz_buff_w_ptr=mz_buff_w_ptr+1
+  'IF mz_buff_w_ptr>=mz_buff_max THEN mz_buff_w_ptr=0
+ ENDIF
+ ' DEBUG
+ 'PRINT "L",x,y
+END
+
+'-------------------
+' PRINT_MZ
+DEF PRINT_MZ str0$
+ VAR i
+ VAR str_ascii,str_mz
+ VAR input_str$,output_num
+ VAR str1$
+ DIM chr_mz[1]
+ ' DUMMY
+ str1$=str0$+"0"
+ IF mz_mode==0 OR mz_mode==2 THEN
+  PRINT str0$
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' DEBUG
+  'PRINT "r_ptr &H";HEX$(mz_buff_r_ptr)
+  'PRINT "buff  &H";HEX$(mz_buff_addr[mz_buff_r_ptr])
+  ' MZ-80C ORIGINAL CHAR
+  'FOR i=0 TO LEN(str1$)-1
+  FOR i=0 TO LEN(str1$)-1
+   'str_ascii=ASC(str0$[i])
+   str_ascii=ASC(str1$[i])
+   str_mz=-1
+   IF (str_ascii>=ASC("A")) AND (str_ascii<=ASC("Z")) THEN
+    ' A-Z
+    str_mz=str_ascii-ASC("A")+&H01
+   ELSEIF (str_ascii>=ASC("a")) AND (str_ascii<=ASC("z")) THEN
+    ' a-z
+    str_mz=str_ascii-ASC("a")+&H01
+   ELSEIF (str_ascii>=ASC("0")) AND (str_ascii<=ASC("9")) THEN
+    ' 0-9
+    str_mz=str_ascii-ASC("0")+&H20
+   ELSEIF (str_ascii>=ASC("!")) AND (str_ascii<=ASC(")")) THEN
+    ' !"#$%&'()
+    str_mz=str_ascii-ASC("!")+&H61
+   ELSE
+    ' TABLE REFARENCE
+    RESTORE @CONV_STR_TABLE
+    WHILE 1
+     READ input_str$,output_num
+     IF input_str$=="" THEN BREAK
+     IF str_ascii==ASC(input_str$) THEN
+      str_mz=output_num
+      BREAK
+     ENDIF
+    WEND
+    IF str_mz==-1 THEN
+     ' ETC.(SPACE)
+     str_mz=&H00
+    ENDIF
+   ENDIF
+   ' DEBUG
+   'PRINT "ASC  &H";HEX$(str_ascii)
+   'PRINT "MZ   &H";HEX$(str_MZ)
+   'PRINT "addr &H";HEX$(mz_buff_addr[mz_buff_r_ptr])
+   IF str_mz<0 THEN str_mz=0
+   ' LAST CHAR
+   IF i>=LEN(str1$)-1 THEN
+    str_mz=-1
+   ENDIF
+   'EMUMEM mz_console_addr, str_mz
+   'mz_console_addr=mz_console_addr+1
+   'EMUMEM mz_buff_addr[mz_buff_r_ptr], str_mz
+   'mz_buff_addr[mz_buff_r_ptr]=mz_buff_addr[mz_buff_r_ptr]+1
+   chr_mz[0]=str_mz
+   COPY mz_buff_chr,mz_console_x_max*mz_buff_w_ptr+i,chr_mz
+   ' DEBUG
+   'PRINT "chr  &H";HEX$(chr_mz[0])
+   'PRINT "ptr  &H";HEX$(mz_console_x_max*mz_buff_w_ptr+i)
+   'PRINT "buff  &H";HEX$(mz_buff_chr[mz_console_x_max*mz_buff_w_ptr+i])
+  NEXT
+  'mz_buff_r_ptr=mz_buff_r_ptr+1
+  'IF mz_buff_r_ptr>=mz_buff_max THEN mz_buff_r_ptr=0
+  mz_buff_w_ptr=mz_buff_w_ptr+1
+  IF mz_buff_w_ptr>=mz_buff_max THEN mz_buff_w_ptr=0
+ ENDIF
+
+ @CONV_STR_TABLE
+  ' ASCII KIGOU
+  DATA "*",&H6B
+  DATA "+",&H6A
+  DATA ",",&H2F
+  DATA "-",&H2A
+  DATA ".",&H2E
+  DATA "/",&H2D
+  DATA ":",&H4F
+  DATA ";",&H2C
+  DATA "<",&H51
+  DATA "=",&H2B
+  DATA ">",&H57
+  DATA "?",&H49
+  DATA "@",&H55
+  DATA "[",&H52
+  DATA "\",&HDD
+  DATA "]",&H54
+  DATA "|",&H35
+  DATA "=",&H2B
+  ' KANA
+  DATA "チ",&H81
+  DATA "コ",&H82
+  DATA "ソ",&H83
+  DATA "シ",&H84
+  DATA "イ",&H85
+  DATA "ハ",&H86
+  DATA "キ",&H87
+  DATA "ク",&H88
+  DATA "ニ",&H89
+  DATA "マ",&H8A
+  DATA "ノ",&H8B
+  DATA "リ",&H8C
+  DATA "モ",&H8D
+  DATA "ミ",&H8E
+  DATA "ラ",&H8F
+  DATA "セ",&H90
+  DATA "タ",&H91
+  DATA "ス",&H92
+  DATA "ト",&H93
+  DATA "カ",&H94
+  DATA "ナ",&H95
+  DATA "ヒ",&H96
+  DATA "テ",&H97
+  DATA "サ",&H98
+  DATA "ン",&H99
+  DATA "ツ",&H9A
+  DATA "ロ",&H9B
+  DATA "ケ",&H9C
+  DATA "「",&H9D
+  DATA "ァ",&H9E
+  DATA "ャ",&H9F
+  DATA "ワ",&HA0
+  DATA "ヌ",&HA1
+  DATA "フ",&HA2
+  DATA "ア",&HA3
+  DATA "ウ",&HA4
+  DATA "エ",&HA5
+  DATA "オ",&HA6
+  DATA "ヤ",&HA7
+  DATA "ユ",&HA8
+  DATA "ヨ",&HA9
+  DATA "ホ",&H9A
+  DATA "ヘ",&HAB
+  DATA "レ",&HAC
+  DATA "メ",&HAD
+  DATA "ル",&HAE
+  DATA "ネ",&HAF
+  DATA "ム",&HB0
+  DATA "」",&HB1
+  DATA "ィ",&HB2
+  DATA "ュ",&HB3
+  DATA "ヲ",&HB4
+  DATA "、",&HB5
+  DATA "ゥ",&HB6
+  DATA "ョ",&HB7
+  DATA "゜",&HB8
+  DATA "．",&HB9
+  DATA "ェ",&HBA
+  DATA "ッ",&HBB
+  DATA "゛",&HBC
+  DATA "。",&HBD
+  DATA "ォ",&HBE
+  DATA "ー",&HBF
+  ' KIGOU
+  'DATA "",&H10
+  'DATA "",&H11
+  'DATA "",&H12
+  'DATA "",&H13
+  'DATA "",&H14
+  'DATA "",&H15
+  'DATA "",&H16
+  'DATA "",&H17
+  'DATA "",&H18
+  'DATA "",&H19
+  'DATA "",&H1A
+  DATA "",&H1B
+  DATA "",&H1C
+  DATA "",&H1D
+  DATA "",&H1E
+  DATA "",&H1F
+  'DATA "",&H30
+  'DATA "",&H31
+  'DATA "",&H32
+  'DATA "",&H33
+  'DATA "",&H34
+  'DATA "",&H35
+  'DATA "",&H36
+  DATA "",&H37
+  'DATA "",&H38
+  DATA "",&H39
+  'DATA "",&H3A
+  'DATA "",&H3B
+  DATA "",&H3C
+  'DATA "",&H3D
+  DATA "",&H3E
+  'DATA "",&H3F
+  DATA "　",&H40
+  DATA "♠",&H41
+  DATA "",&H42
+  DATA "",&H43
+  DATA "♦",&H44
+  DATA "←",&H45
+  DATA "♣",&H46
+  DATA "●",&H47
+  DATA "",&H48
+  DATA "？",&H49
+  DATA "",&H4A
+  'DATA "",&H4B
+  'DATA "",&H4C
+  DATA "",&H4D
+  DATA "",&H4E
+  DATA "：",&H4F
+  DATA "↑",&H50
+  DATA "＜",&H51
+  DATA "[",&H52
+  DATA "♥",&H53
+  DATA "]",&H54
+  DATA "＠",&H55
+  DATA "",&H56
+  DATA "＞",&H57
+  'DATA "",&H58
+  'DATA "",&H59
+  DATA "",&H5A
+  'DATA "",&H5B
+  DATA "",&H5C
+  DATA "",&H5D
+  DATA "",&H5E
+  DATA "",&H5F
+  'DATA "",&H60
+  'DATA "",&H61
+  'DATA "",&H62
+  'DATA "",&H63
+  'DATA "",&H64
+  'DATA "",&H65
+  'DATA "",&H66
+  'DATA "",&H67
+  'DATA "",&H68
+  'DATA "",&H69
+  'DATA "",&H6A
+  'DATA "",&H6B
+  'DATA "",&H6C
+  DATA "",&H6D
+  'DATA "",&H6E
+  'DATA "",&H6F
+  'DATA "",&H70
+  'DATA "",&H71
+  'DATA "",&H72
+  'DATA "",&H73
+  'DATA "",&H74
+  'DATA "",&H75
+  DATA "",&H76
+  DATA "",&H77
+  'DATA "",&H78
+  'DATA "",&H79
+  DATA "",&H7A
+  'DATA "",&H7B
+  'DATA "",&H7C
+  'DATA "",&H7D
+  DATA "",&H7E
+  'DATA "",&H7F
+  DATA "",&HC0
+  'DATA "",&HC1
+  'DATA "",&HC2
+  'DATA "",&HC3
+  'DATA "",&HC4
+  'DATA "",&HC5
+  'DATA "",&HC6
+  DATA "",&HC7
+  DATA "",&HC8
+  DATA "",&HC9
+  DATA "",&HCA
+  DATA "",&HCB
+  DATA "",&HCC
+  DATA "",&HCD
+  DATA "",&HCE
+  DATA "",&HCF
+  ' KANJI
+  DATA "日",&HD0
+  DATA "月",&HD1
+  DATA "火",&HD2
+  DATA "水",&HD3
+  DATA "木",&HD4
+  DATA "金",&HD5
+  DATA "土",&HD6
+  DATA "生",&HD7
+  DATA "年",&HD8
+  DATA "時",&HD9
+  DATA "分",&HDA
+  DATA "秒",&HDB
+  DATA "円",&HDC
+  DATA "￥",&HDD
+  DATA "£",&HDE
+  DATA "",&HDF
+  'DATA "",&HE0
+  'DATA "",&HE1
+  'DATA "",&HE2
+  'DATA "",&HE3
+  'DATA "",&HE4
+  'DATA "",&HE5
+  'DATA "",&HE6
+  'DATA "",&HE7
+  'DATA "",&HE8
+  'DATA "",&HE9
+  'DATA "",&HEA
+  'DATA "",&HEB
+  DATA "",&HEC
+  DATA "",&HED
+  'DATA "",&HEE
+  'DATA "",&HEF
+  ' 2*2 DOT
+  'DATA "",&HF0
+  DATA "",&HF1
+  DATA "",&HF2
+  DATA "",&HF3
+  DATA "",&HF4
+  DATA "",&HF5
+  DATA "",&HF6
+  DATA "",&HF7
+  DATA "",&HF8
+  DATA "",&HF9
+  DATA "",&HFA
+  DATA "",&HFB
+  DATA "",&HFC
+  DATA "",&HFD
+  DATA "",&HFE
+  DATA "",&HFF
+  DATA "",0
+END
+
