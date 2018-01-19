@@ -13,3 +13,12 @@
 - By modifying cls, locate, print, text will be displayed on the emulator side.
 - It is necessary to call every frame update function.
 <img src = "https://raw.githubusercontent.com/sacokoala/smilebasic_games/master/images/framework_sb_mz_01.png">
+
+## blockball_sb_mz
+- Block break of SmileBASIC for petitcone was ported to SmileBASIC on Pasocommini.
+- Original is from Mr. Takuya Matsubara.
+I got permission to transplant those published on the following site.
+-- Takuya Matsubara's hobby page
+https://sites.google.com/site/yugenkaisyanico/home
+- Since BG display is substituted by text display, it is considerably inferior to 3DS and WiiU. (But it is good)
+<img src="https://raw.githubusercontent.com/sacokoala/smilebasic_games/master/images/blockball_sb_mz_01.png">
