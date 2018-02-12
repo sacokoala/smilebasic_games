@@ -15,10 +15,19 @@
 <img src = "https://raw.githubusercontent.com/sacokoala/smilebasic_games/master/images/framework_sb_mz_01.png">
 
 ## blockball_sb_mz
-- Block break of SmileBASIC for petitcone was ported to SmileBASIC on Pasocommini.
+- Block break of SmileBASIC for Petitcom was ported to SmileBASIC on Pasocommini.
 - Original is from Mr. Takuya Matsubara.
 I got permission to transplant those published on the following site.
 - Takuya Matsubara's hobby page
 https://sites.google.com/site/yugenkaisyanico/home
 - Since BG display is substituted by text display, it is considerably inferior to 3DS and WiiU. (But it is good)
 <img src="https://raw.githubusercontent.com/sacokoala/smilebasic_games/master/images/blockball_sb_mz_01.png">
+
+## soukogame_sb_mz
+- SmileBASIC warehouse game for Petitcom has been ported to SmileBASIC on Pasocommini.
+- Original is from Mr. Takuya Matsubara.
+I got permission to transplant those published on the following site.
+- Takuya Matsubara's hobby page
+https://sites.google.com/site/yugenkaisyanico/home
+- The original displayed all the maps with sprites, but text display can be selected as well.
+<img src="https://raw.githubusercontent.com/sacokoala/smilebasic_games/master/images/soukogame_sb_mz_01.png">

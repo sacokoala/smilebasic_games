@@ -1,0 +1,1188 @@
+'=======================================
+' そうこゲーム モドキ
+' 2018/02/10 sacokoala
+'=======================================
+'-------------------
+' GLOBAL VARIABLE
+
+' 0=SmileBASIC 1=MZ-80C 2=both (3=MZ-80C fullscreen)
+VAR mz_mode=0
+' MZ-80C 40*25 CONSOLE
+VAR mz_console_x_max=40
+VAR mz_console_y_max=25
+VAR mz_console_addr=&HD000
+VAR mz_buff_r_ptr=0
+VAR mz_buff_w_ptr=0
+VAR mz_buff_max=256
+DIM mz_buff_addr[mz_buff_max]
+DIM mz_buff_chr[mz_console_x_max*mz_buff_max]
+
+'VAR score_1P=0
+'VAR score_2P=0
+VAR score=0
+VAR hi_score=0
+
+' SELECT_SB_MZ
+SELECT_SB_MZ
+
+' INIT
+SB_INIT
+MZ_INIT
+
+
+UPDATE_MZ
+VSYNC_MZ 5
+
+'-------------------
+' INIT
+GOSUB @INITGAME
+
+' SCENE LOOP
+@SCENE_TOP
+
+' DEBUG
+'DEBUG_SCENE
+'DEBUG_SCENE2
+
+' GAME
+GOSUB @GAME_SCENE
+
+GOTO @SCENE_TOP
+'-------------------
+
+'=======================================
+
+'---しょきか
+@INITGAME
+STAGE_MAX=9
+STAGE_SELECT=FALSE
+CLS_MZ
+IF mz_mode==0 THEN
+ VISIBLE 1,0,1
+ELSE
+ VISIBLE 1,0,0
+ENDIF
+'GIVEUP=TRUE
+ID_WALL=1  '1:かべ
+ID_BOX=2   '2:はこ
+ID_START=3 '3:スタート
+ID_GOAL=4  '4:ゴール
+ID_GOAL_BOX=5  '5:ゴール+はこ
+DIM X1[4],Y1[4], MYCH[4]
+DIM SPCH[5]
+FOR I=0 TO 3
+ READ X1[I],Y1[I],MYCH[I]
+NEXT
+DATA  1,0 ,2544   '0:みぎ
+DATA  0,1 ,2548   '1:した
+DATA -1,0 ,2552   '2:ひだり
+DATA  0,-1,2556   '3:うえ
+FOR I=1 TO 4
+ READ SPCH[I]
+NEXT
+DATA 2290  '1:かべ
+DATA 2317  '2:はこ
+DATA 2548  '3:スタート
+DATA 2346  '4:ゴール
+RETURN
+'---ゲームシーン（タイトル、スタート、ゲームメイン、クリア、ギブアップ）
+@GAME_SCENE
+'GOSUB @INITGAME
+GIVEUP=TRUE
+SPMAX=0
+WHILE 1
+ GOSUB @INITGAME2
+ 'MESSAGE " STAGE "+STR$(STAGE)+" "
+ GOSUB @STATUS
+ WHILE 1
+  GOSUB @PLAYER
+  'PL_WAIT=PLAYER_MOVE
+  'UPDATE_MZ
+  'VSYNC 16
+  'FOR I=0 TO 15
+  ' C$=INKEY$() 'for KEY REPEAT
+  ' VSYNC 1
+  'NEXT
+  GOSUB @STATUS
+  IF (GCNT==BCNT)OR(GIVEUP==TRUE) THEN BREAK
+ WEND
+ IF GCNT==BCNT THEN
+  'BGMPLAY 4
+  'BEEP 5
+  MESSAGE " CLEAR! "
+  STAGE=STAGE+1
+  STAGE_SELECT=TRUE
+  IF STAGE>STAGE_MAX THEN BREAK
+ ELSE
+  'BGMPLAY 5
+  BEEP 3
+  SPANIM AN, "I", 1, 2516, 1
+  MESSAGE " GIVE UP "
+ ENDIF
+ SPCLR_ALL SPMAX
+WEND
+SPCLR_ALL SPMAX
+CLS_MZ
+BEEP 5
+MESSAGE " ALL CLEAR!!! "
+STAGE=1
+'END
+RETURN
+'---しょきか2
+@INITGAME2
+IF GIVEUP==TRUE THEN
+ GOSUB @TITLE
+ GIVEUP=FALSE
+ 'STAGE=1
+ENDIF
+UPDATE_MZ
+CLS_MZ
+'VSYNC_MZ 20
+FOR I=0 TO 20
+ C$=INKEY$() 'for KEY REPEAT
+ VSYNC_MZ 1
+NEXT
+IF STAGE<STAGE_MAX THEN
+ MESSAGE " STAGE "+STR$(STAGE)+" "
+ELSE
+ MESSAGE " FINAL STAGE "
+ENDIF
+'LAY=0
+'BGSCREEN LAY,25,15
+RESTORE "@MAP"+FORMAT$("%02D",STAGE)
+HABA=16    '1マスのいどうりょう
+SPN=0   'スプライトばんごう
+FOR TY=0 TO 10
+ READ A$
+ IF A$=="" THEN BREAK
+ FOR TX=0 TO LEN(A$)-1
+  'BGPUT LAY,TX,TY,571
+  ID=VAL(MID$(A$,TX,1))
+  IF ID==0 THEN CONTINUE
+  'X=(TX*HABA)+(HABA/2)
+  'Y=(TY*HABA)+HABA
+  X=(TX*HABA)+(HABA)
+  Y=(TY*HABA)+(HABA*2)
+  Z=-ID
+  SPSET SPN,SPCH[ID]
+  SPOFS SPN, X, Y, Z
+  SPHOME SPN,HABA/2,HABA-1
+  SPVAR SPN,0,ID
+  'SPBGPUT X,Y,ID
+  IF ID==ID_START THEN AN=SPN 'スプライトばんごう
+  SPN=SPN+1
+ NEXT
+NEXT
+SPMAX=SPN  'ぜんスプライトすう
+FOR SPN=0 TO SPMAX-1
+ SPOFS SPN OUT TX,TY
+ ID=SPVAR(SPN,0)
+ SPBGPUT TX,TY,ID
+NEXT
+UPDATE_MZ
+RETURN
+'---プレイヤー
+@PLAYER
+T=15
+WHILE 1
+ UPDATE_MZ
+ VSYNC_MZ 1
+ BT=BUTTON()
+ 'IF BT==#RIGHT THEN MUKI=0:BREAK
+ 'IF BT==#DOWN  THEN MUKI=1:BREAK
+ 'IF BT==#LEFT  THEN MUKI=2:BREAK
+ 'IF BT==#UP    THEN MUKI=3:BREAK
+ 'IF BT==#X     THEN GIVEUP=TRUE:RETURN
+ IF BT==(1<<#EMUJOY_RIGHT) THEN MUKI=0:BREAK
+ IF BT==(1<<#EMUJOY_DOWN)  THEN MUKI=1:BREAK
+ IF BT==(1<<#EMUJOY_LEFT)  THEN MUKI=2:BREAK
+ IF BT==(1<<#EMUJOY_UP)    THEN MUKI=3:BREAK
+ 'IF BT==(1<<#EMUJOY_2)     THEN GIVEUP=TRUE:RETURN
+ IF BT==(1<<#EMUJOY_2)     THEN GIVEUP=TRUE:GOTO @PLAYER_END
+ C$=INKEY$()
+ 'DIAMOND CURSOR
+ IF C$=="D" THEN MUKI=0:BREAK
+ IF C$=="X" THEN MUKI=1:BREAK
+ IF C$=="S" THEN MUKI=2:BREAK
+ IF C$=="E" THEN MUKI=3:BREAK
+ IF C$=="d" THEN MUKI=0:BREAK
+ IF C$=="x" THEN MUKI=1:BREAK
+ IF C$=="s" THEN MUKI=2:BREAK
+ IF C$=="u" THEN MUKI=3:BREAK
+ 'ZEPLIS
+ IF C$=="K" THEN MUKI=0:BREAK
+ IF C$=="M" THEN MUKI=1:BREAK
+ IF C$=="H" THEN MUKI=2:BREAK
+ IF C$=="U" THEN MUKI=3:BREAK
+ IF C$=="k" THEN MUKI=0:BREAK
+ IF C$=="m" THEN MUKI=1:BREAK
+ IF C$=="h" THEN MUKI=2:BREAK
+ IF C$=="u" THEN MUKI=3:BREAK
+ 'TEN KEY
+ IF C$=="6" THEN MUKI=0:BREAK
+ IF C$=="2" THEN MUKI=1:BREAK
+ IF C$=="4" THEN MUKI=2:BREAK
+ IF C$=="8" THEN MUKI=3:BREAK
+ 'CURSOR KEY
+ IF C$==CHR$(28) THEN MUKI=0:BREAK
+ IF C$==CHR$(31) THEN MUKI=1:BREAK
+ IF C$==CHR$(29) THEN MUKI=2:BREAK
+ IF C$==CHR$(30) THEN MUKI=3:BREAK
+ 'GIVEUP
+ 'IF C$==CHR$(13) OR C$==CHR$(32) THEN GIVEUP=TRUE:RETURN
+ IF C$==CHR$(13) OR C$==CHR$(32) THEN GIVEUP=TRUE:GOTO @PLAYER_END
+ 'DEBUG
+ 'IF C$!="" THEN PRINT ASC(C$)
+WEND
+'BEEP 59
+ID=-1
+ID1=-1
+ID2=-1
+SPOFS AN OUT AX,AY
+AX1=AX+(X1[MUKI]*HABA)
+AY1=AY+(Y1[MUKI]*HABA)
+ID1=SPGETID(AX1,AY1)
+IF ID1==ID_WALL THEN
+ BEEP 1
+ 'RETURN
+ GOTO @PLAYER_END
+ENDIF
+IF ID1==ID_BOX THEN
+ AX2=AX1+(X1[MUKI]*HABA)
+ AY2=AY1+(Y1[MUKI]*HABA)
+ ID2=SPGETID(AX2,AY2)
+ IF ID2==ID_BOX OR ID2==ID_WALL THEN
+  BEEP 1
+  'RETURN
+  GOTO @PLAYER_END
+ ENDIF
+ 'IF ID2==ID_GOAL THEN BEEP 7
+ IF ID2==ID_GOAL THEN
+  BEEP 2
+ ELSE
+  BEEP 4
+ ENDIF
+ 'BEEP 40
+ SPANIM BOXSPN,"XY",1,AX1,AY1,-T,AX2,AY2,1
+ 'SPBGPUT AX2,AY2,ID1
+ ID2=SPGETID(AX2,AY2)
+ 'IF ID2==ID_GOAL THEN
+ ' SPBGPUT AX2,AY2,ID_GOAL_BOX
+ 'ELSE
+ ' SPBGPUT AX2,AY2,ID_BOX
+ 'ENDIF
+ SPBGPUT AX2-(X1[MUKI]*HABA/2),AY2-(Y1[MUKI]*HABA/2),ID_BOX
+ELSE
+ BEEP 4
+ENDIF
+'SPBGPUT AX,AY,-1
+'SPBGPUT AX1,AY1,0
+SPANIM AN,"XY",1,AX,AY,-T,AX1,AY1,1
+C=MYCH[MUKI]
+SPANIM AN,"I",T/4,C,T/4,C+1,T/4,C+2,T/4,C+3,1
+'SPBGPUT AX,AY,-1
+ID=SPGETID(AX,AY)
+IF ID==ID_GOAL THEN
+ SPBGPUT AX,AY,ID_GOAL
+ELSE
+ SPBGPUT AX,AY,-1
+ENDIF
+SPBGPUT AX1-(X1[MUKI]*HABA/2),AY1-(Y1[MUKI]*HABA/2),0
+'DEBUG
+'LOCATE 0,31
+'PRINT "ID=";ID;" AX=";AX;" AY=";AY
+
+@PLAYER_MOVE
+'0-7FRAME
+UPDATE_MZ
+FOR I=0 TO 7
+ C$=INKEY$() 'for KEY REPEAT
+ VSYNC_MZ 1
+NEXT
+'7-15FRAME
+IF ID!=-1 THEN
+ IF ID==ID_GOAL THEN
+  SPBGPUT AX,AY,ID_GOAL
+ ELSE
+  SPBGPUT AX,AY,-1
+ ENDIF
+ENDIF
+IF ID2!=-1 THEN
+ IF ID2==ID_GOAL THEN
+  SPBGPUT AX2,AY2,ID_GOAL_BOX
+ ELSE
+  SPBGPUT AX2,AY2,ID_BOX
+ ENDIF
+ENDIF
+SPBGPUT AX1,AY1,0
+UPDATE_MZ
+FOR I=8 TO 15
+ C$=INKEY$() 'for KEY REPEAT
+ VSYNC_MZ 1
+NEXT
+RETURN
+
+@PLAYER_END
+UPDATE_MZ
+FOR I=0 TO 15
+ C$=INKEY$() 'for KEY REPEAT
+ VSYNC_MZ 1
+NEXT
+RETURN
+'--- スプライトをさがす
+DEF SPGETID(X,Y)
+ ID=999
+ FOR SPN=0 TO SPMAX-1
+  SPOFS SPN OUT TX,TY
+  IF ABS(X-TX)<HABA AND ABS(Y-TY)<HABA THEN
+   NEWID=SPVAR(SPN,0)
+   IF NEWID==ID_BOX THEN BOXSPN=SPN
+   IF NEWID!=ID_START THEN
+    IF ID>NEWID THEN ID=NEWID
+   ENDIF
+  ENDIF
+ NEXT
+ RETURN ID
+END
+'--- スプライトをけす
+DEF SPCLR_ALL SPMAX
+ FOR SPN=0 TO SPMAX
+  SPCLR SPN
+ NEXT
+END
+'--—メッセージ
+DEF MESSAGE A$
+VISIBLE 1,0,0
+'TX=25-(LEN(A$)/2):TY= 14
+TX=(mz_console_x_max/2)-(LEN(A$)/2):TY=(mz_console_y_max/2)-2
+COLOR2_MZ #YELLOW,#MAROON:
+LOCATE_MZ TX,TY-1:PRINT_MZ " "*LEN(A$)
+LOCATE_MZ TX,TY:PRINT_MZ A$
+LOCATE_MZ TX,TY+1:PRINT_MZ " "*LEN(A$)
+UPDATE_MZ
+'VSYNC_MZ 120
+FOR I=0 TO 120
+ C$=INKEY$() 'for KEY REPEAT
+ VSYNC_MZ 1
+NEXT
+COLOR2_MZ #WHITE, 0:
+LOCATE_MZ TX,TY-1:PRINT_MZ " "*LEN(A$)
+LOCATE_MZ TX,TY:PRINT_MZ " "*LEN(A$)
+LOCATE_MZ TX,TY+1:PRINT_MZ " "*LEN(A$)
+IF mz_mode==0 THEN
+ VISIBLE 1,0,1
+ELSE
+ VISIBLE 1,0,0
+ENDIF
+RETURN
+END 
+'---ステータス
+@STATUS
+BCNT=0   'かんりょうしたかず
+GCNT=0   'ゴールのかず
+FOR I=0 TO SPMAX-1
+ IF SPVAR(I,0)==ID_GOAL THEN
+  GCNT=GCNT+1
+  SPOFS I OUT X,Y
+  IF SPGETID(X,Y)==ID_BOX THEN BCNT=BCNT+1
+ ENDIF
+NEXT
+COLOR2_MZ #WHITE,#BLACK
+'LOCATE_MZ 18,26
+'LOCATE_MZ (mz_console_x_max/2)-4,mz_console_y_max-1
+LOCATE_MZ (mz_console_x_max/2)-4,1
+'PRINT "GOAL ";BCNT; "/";GCNT;
+PRINT_STR$="GOAL "+STR$(BCNT)+"/"+STR$(GCNT)
+PRINT_MZ PRINT_STR$
+RETURN
+'---タイトル
+@TITLE
+CLS_MZ
+'COLOR2_MZ #WHITE,#PURPLE
+'LOCATE_MZ 17, 8:PRINT_MZ "  SOUKO GAME   "
+'LOCATE_MZ 16,19:PRINT_MZ " PUSH ANY BUTTON "
+COLOR2_MZ #WHITE,#BLACK
+'LOCATE_MZ (mz_console_x_max/2)-5,(mz_console_y_max/2)-5
+'PRINT_MZ "SOUKO GAME"
+'LOCATE_MZ (mz_console_x_max/2)-7,(mz_console_y_max/2)+3
+'PRINT_MZ "PUSH ANY BUTTON"
+LOCATE_MZ (mz_console_x_max/2)-7,(mz_console_y_max/2)-9
+PRINT_MZ "**************"
+LOCATE_MZ (mz_console_x_max/2)-7,(mz_console_y_max/2)-8
+PRINT_MZ "* SOUKO GAME *"
+LOCATE_MZ (mz_console_x_max/2)-7,(mz_console_y_max/2)-7
+PRINT_MZ "**************"
+LOCATE_MZ 9,11
+PRINT_MZ "[CURSOR] ...PLAYER MOVE"
+LOCATE_MZ 9,12
+PRINT_MZ "[TENKEY] ...PLAYER MOVE"
+LOCATE_MZ 9,14
+PRINT_MZ "[SPACE]  ...GIVE UP"
+LOCATE_MZ 9,15
+PRINT_MZ "[RETURN] ...GIVE UP"
+IF STAGE_SELECT==TRUE THEN
+ LOCATE_MZ 9,17
+ PRINT_MZ "[1]-["+STR$(STAGE_MAX)+"]  ...STAGE SELECT"
+ENDIF
+LOCATE_MZ (mz_console_x_max/2)-7,(mz_console_y_max/2)+7
+PRINT_MZ "PUSH ANY BUTTON"
+
+COLOR2_MZ #WHITE,#BLACK
+UPDATE_MZ
+STAGE=1
+FOR I=0 TO 5
+ C$=INKEY$() 'for KEY REPEAT
+ VSYNC_MZ 1
+NEXT
+WHILE(BUTTON()==0)
+ C$=INKEY$()
+ IF (C$>="1")AND(C$<=STR$(STAGE_MAX)) THEN STAGE=VAL(C$)
+ IF C$!="" THEN BREAK
+ VSYNC_MZ 1
+WEND
+RETURN
+'---マップ
+@MAP01
+DATA "111111111"
+DATA "1       1"
+DATA "1 3 2 4 1"
+DATA "1       1"
+DATA "111111111"
+DATA ""
+@MAP02
+DATA "111111111111"
+DATA "11         1" 
+DATA "1 3 2    4 1"
+DATA "1  12    4 1"
+DATA "1          1"
+DATA "111111111111"
+DATA "
+@MAP03
+DATA "111111111111"
+DATA "1         11"
+DATA "1  4 1 2   1"
+DATA "1 3        1"
+DATA "1   21     1"
+DATA "1      4   1"
+DATA "1  2 1  4  1"
+DATA "1          1"
+DATA "111111111111"
+DATA ""
+@MAP04
+DATA "11111111111"
+DATA "111  1   11"
+DATA "1   2    11"
+DATA "1 3 21144 1"
+DATA "1   2  44 1"
+DATA "1   2111  1"
+DATA "11       11"
+DATA "111  1   11"
+DATA "111111111111"
+DATA ""
+@MAP05
+DATA "111111111111"
+DATA "11   1111111"
+DATA "1 21 4    11"
+DATA "1  111112  1"
+DATA "1   44  2  1"
+DATA "1 2 11     1"
+DATA "11   4   111"
+DATA "111  1 3  11"
+DATA "111111111111"
+DATA ""
+@MAP06
+DATA "111111111111111"
+DATA "111111        1"
+DATA "1        2222 1"
+DATA "1 242 2424444 1"
+DATA "1 244 442  42 1"
+DATA "1 24 4 42 42  1"
+DATA "1 24 2 424444 1"
+DATA "1     3  2222 1"
+DATA "111111        1"
+DATA "111111111111111"
+DATA ""
+@MAP07
+DATA "1111111"
+DATA "1  3  1"
+DATA "11  2 1"
+DATA "1  24 1"
+DATA "1  11 1"
+DATA "11 11 1"
+DATA "11 11 1"
+DATA "1  42 1"
+DATA "1   411"
+DATA "11    1"
+DATA "1111111"
+DATA ""
+@MAP08
+DATA "1111111111111111111"
+DATA "1           11   11"
+DATA "1  111  22        1"
+DATA "1   1  1 11 11 4  1"
+DATA "1 3     2   1144441"
+DATA "1  211 1 11    4  1"
+DATA "1 22   1    11   11"
+DATA "11     1 1 111    1"
+DATA "1111111111111111111"
+DATA ""
+@MAP09
+DATA "1111111111111111111"
+DATA "1     1     1     1"
+DATA "1 22     34 1 444 1"
+DATA "1  2  11    1     1"
+DATA "1     1     1   1 1"
+DATA "111111111 11111 111"
+DATA "    1   1  1      1"
+DATA "    1 4    1 2 2  1"
+DATA "    1 44      22  1"
+DATA "    1      1      1"
+DATA "    111111111111111"
+DATA ""
+'DEBUG
+'@MAP09
+DATA "1111111"
+DATA "1     1"
+DATA "1 324 1"
+DATA "1     1"
+DATA "1111111"
+DATA ""
+
+
+'-------------------------
+'SP>BG
+DEF SPBGPUT BGX,BGY,BGCHR
+ IF mz_mode==0 THEN RETURN
+ BGCHR0$="  "
+ BGCHR0$="  "
+'ID_WALL=1  '1:かべ
+'ID_BOX=2   '2:はこ
+'ID_START=3 '3:スタート
+'ID_GOAL=4  '4:ゴール
+'ID_GOAL_BOX=5  '5:ゴール+はこ
+ IF BGCHR==0 THEN
+  COLOR_MZ #RED
+  'BGCHR0$=""
+  IF MUKI==0 THEN
+   BGCHR0$="()"
+   BGCHR1$="T"
+  ELSEIF MUKI==2 THEN
+   BGCHR0$="()"
+   BGCHR1$="T"
+  ELSE
+   BGCHR0$="()"
+   BGCHR1$=""
+  ENDIF
+ ELSEIF BGCHR==1 THEN
+  'COLOR_MZ #MAROON
+  COLOR_MZ #GRAY
+  BGCHR0$=""
+  BGCHR1$=""
+ ELSEIF BGCHR==2 THEN
+  COLOR_MZ #YELLOW
+  'BGCHR0$=""
+  'BGCHR1$=""
+  BGCHR0$=""
+  BGCHR1$=""
+ ELSEIF BGCHR==3 THEN
+  COLOR_MZ #RED
+  BGCHR0$="()"
+  BGCHR1$=""
+ ELSEIF BGCHR==4 THEN
+  COLOR_MZ #WHITE
+  BGCHR0$=""
+  BGCHR1$=""
+ ELSEIF BGCHR==5 THEN
+  COLOR_MZ #YELLOW
+  'BGCHR0$=""
+  'BGCHR1$=""
+  BGCHR0$=""
+  BGCHR1$=""
+ ELSEIF BGCHR==-1 THEN
+  BGCHR0$="  "
+  BGCHR1$="  "
+ ENDIF
+ LOCATE_MZ (BGX/8)-1,(BGY/8)-2
+ PRINT_MZ BGCHR0$
+ LOCATE_MZ (BGX/8)-1,(BGY/8)-1
+ PRINT_MZ BGCHR1$
+ COLOR_MZ #WHITE
+END
+
+
+'=======================================
+
+'-------------------
+' DEBUG
+DEF DEBUG_SCENE
+ CLS_MZ
+ LOCATE_MZ 0,2
+ PRINT_MZ "PRINT TEST (DEBUG)"
+ COLOR_MZ #RED
+ LOCATE_MZ 0,4
+ PRINT_MZ "ABCDEFG HIJKLMN OPQRSTU VWXYZ"
+ COLOR_MZ #BLUE
+ LOCATE_MZ 0,5
+ PRINT_MZ "abcdefg hijklmn opqrstu vwxyz"
+ COLOR_MZ #YELLOW
+ LOCATE_MZ 0,6
+ PRINT_MZ "0123456789"
+ COLOR_MZ #GREEN
+ LOCATE_MZ 0,7
+ PRINT_MZ "!#$%&'()"
+ COLOR_MZ #FUCHSIA
+ LOCATE_MZ 0,8
+ PRINT_MZ "*+,-./:;"
+ COLOR_MZ #MAGENTA
+ LOCATE_MZ 0,9
+ PRINT_MZ "<=>?@[\]|="
+ COLOR_MZ #CYAN
+ LOCATE_MZ 0,10
+ PRINT_MZ "チコソシイハキクニマノリモミラ"
+ COLOR_MZ #AQUA
+ LOCATE_MZ 0,11
+ PRINT_MZ "セタストカナヒテサンツロケ「ァャ"
+ COLOR_MZ #PURPLE
+ LOCATE_MZ 0,12
+ PRINT_MZ "ワヌフアウエオヤユヨホヘレメルネ"
+ COLOR_MZ #LIME
+ LOCATE_MZ 0,13
+ PRINT_MZ "ム」ィュヲ、ゥョ゜．ェッ゛。ォー"
+ COLOR_MZ #SILVER
+ LOCATE_MZ 0,14
+ PRINT_MZ "♠♦←♣●？：↑＜[♥]＠＞"
+ COLOR2_MZ #NAVY,#GRAY
+ LOCATE_MZ 0,15
+ PRINT_MZ ""
+ COLOR2_MZ #WHITE,#BLACK
+ LOCATE_MZ 0,16
+ PRINT_MZ "日月火水木金土生年時分秒円\£"
+ LOCATE_MZ 0,17
+ PRINT_MZ ""
+ LOCATE_MZ 0,18
+ PRINT_MZ ""
+ UPDATE_MZ
+ VSYNC_MZ 180
+END
+
+'-------------------
+' DEBUG
+DEF DEBUG_SCENE2
+ VAR y
+ CLS_MZ
+ FOR y=0 TO mz_console_y_max-1
+  LOCATE_MZ 0,y
+  PRINT_MZ "HELLO WORLD."+STR$(y)
+ NEXT
+ UPDATE_MZ
+ VSYNC_MZ 180
+END
+
+'-------------------
+' SELECT_SB_MZ
+DEF SELECT_SB_MZ
+ VAR sel$
+ ACLS
+ VISIBLE 1,0,0
+ mz_mode=-1
+ WHILE mz_mode==-1
+  VSYNC 1
+  CLS
+  'PRINT "Select game mode.(0:SmileBasic 1:MZ-80C)"
+  'sel$=INKEY$()
+  LOCATE 2,2
+  INPUT"Select game mode.(0:SmileBasic 1:MZ-80C 2:both (3:MZ-80C fullscreen))";sel$
+  IF sel$=="0" THEN
+   mz_mode=0
+  ELSEIF sel$=="1" THEN
+   mz_mode=1
+  ELSEIF sel$=="2" THEN
+   mz_mode=2
+  ELSEIF sel$=="3" THEN
+   mz_mode=3
+  ELSE
+   mz_mode=-1
+  ENDIF
+ WEND
+END
+
+'-------------------
+' SB_INIT
+DEF SB_INIT
+ ACLS
+ VISIBLE 1,0,0
+ IF mz_mode>=1 THEN
+  XSCREEN 640,360,16/9
+ ELSE
+  XSCREEN 320,240,4/3
+ ENDIF
+END
+
+'-------------------
+' MZ_INIT
+DEF MZ_INIT
+ IF mz_mode>=1 THEN
+  ' MZ-80C RESET
+  EMURESET
+  ' MZ-80C 320*200 (40*25 CONSOLE)
+  IF mz_mode==1 THEN
+   'EMUWINDOW 960,0,320,200
+   'EMUWINDOW 640,0,640,400
+   EMUWINDOW 320,0,960,600
+   'EMUWINDOW 5
+   ' CURSOR OFF
+   'mem_e000=EMUMEM(&HE000)
+   'EMUMEM &HE000, mem_e000 OR &H80
+   PRINT " "
+   PRINT "MZ-80C CLOSE COMMAND"
+   PRINT " "
+   PRINT "[EMUWINDOW 0]"
+   PRINT "  OR"
+   PRINT "[ACLS]"
+   PRINT " "
+  ELSEIF mz_mode==2 THEN
+   EMUWINDOW 640,0,640,400
+  ELSEIF mz_mode==3 THEN
+   XSCREEN 320,240,4/3
+   'EMUWINDOW 16,16,320,200
+   EMUWINDOW 5
+   mz_mode=1
+  ENDIF
+  VSYNC_MZ 180
+ ELSE
+  EMUWINDOW 0
+ ENDIF
+
+END
+
+
+'=======================================
+
+'-------------------
+' VSYNC_MZ
+DEF VSYNC_MZ frame
+ VAR i
+ FOR i=0 TO frame-1
+  VSYNC 1
+  IF mz_mode>=1 THEN
+   EMUMEM &HE000,0
+  ENDIF
+ NEXT
+END
+
+'-------------------
+' UPDATE_MZ
+DEF UPDATE_MZ
+ VAR i,j
+ IF mz_mode==0 OR mz_mode==2 THEN
+  ' SmileBASIC NO UPDATE
+ ENDIF
+ IF mz_mode>=1 THEN
+  FOR j=0 TO mz_buff_max-1
+   IF mz_buff_r_ptr==mz_buff_w_ptr THEN BREAK
+   FOR i=0 TO mz_console_x_max-1
+    ' DEBUG
+    'PRINT "i    &H";HEX$(i)
+    'PRINT "addr &H";HEX$(mz_buff_addr[mz_buff_r_ptr]+i)
+    'PRINT "chr  &H";HEX$(mz_buff_chr[mz_console_x_max*mz_buff_r_ptr+i])
+    IF mz_buff_chr[mz_console_x_max*mz_buff_r_ptr+i]==-1 THEN BREAK
+    EMUMEM mz_buff_addr[mz_buff_r_ptr]+i, mz_buff_chr[mz_console_x_max*mz_buff_r_ptr+i]
+   NEXT
+   mz_buff_r_ptr=mz_buff_r_ptr+1
+   IF mz_buff_r_ptr>=mz_buff_max THEN mz_buff_r_ptr=0
+  NEXT
+ ENDIF
+END
+
+'-------------------
+' CLS_MZ
+DEF CLS_MZ
+ VAR i
+ IF mz_mode==0 OR mz_mode==2 THEN
+  CLS
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C 40*25 CONSOLE
+  FOR i=0 TO mz_console_x_max*mz_console_y_max-1
+   EMUMEM &HD000+i, 0
+  NEXT
+ ENDIF
+END
+
+'-------------------
+' COLOR_MZ
+DEF COLOR_MZ col
+ IF mz_mode==0 OR mz_mode==2 THEN
+  COLOR2_MZ col,0
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C NO COLOR (ALL GREEN)
+ ENDIF
+END
+DEF COLOR2_MZ col,col2
+ IF mz_mode==0 OR mz_mode==2 THEN
+  COLOR col,col2
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C NO COLOR (ALL GREEN)
+ ENDIF
+END
+
+'-------------------
+' LOCATE_MZ
+DEF LOCATE_MZ x,y
+ x=ROUND(x)
+ y=ROUND(y)
+ ' DEBUG
+ IF (x<0)OR(x>=mz_console_x_max) THEN
+  PRINT "LOCATE_MZ ERROR x=";x
+ ENDIF
+ IF (y<0)OR(y>=mz_console_y_max) THEN
+  PRINT "LOCATE_MZ ERROR y=";y
+ ENDIF
+ IF mz_mode==0 OR mz_mode==2 THEN
+  LOCATE x,y
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' MZ-80C 40*25 CONSOLE
+  'mz_console_addr = &HD000 + (x + mz_console_x_max*y)
+  DIM addr[1]
+  addr[0]=&HD000 + (x + mz_console_x_max*y)
+  COPY mz_buff_addr,mz_buff_w_ptr,addr
+  ' DEBUG
+  'PRINT "w_ptr &H";HEX$(mz_buff_w_ptr)
+  'PRINT "buff  &H";HEX$(mz_buff_addr[mz_buff_w_ptr])
+  'mz_buff_w_ptr=mz_buff_w_ptr+1
+  'IF mz_buff_w_ptr>=mz_buff_max THEN mz_buff_w_ptr=0
+ ENDIF
+ ' DEBUG
+ 'PRINT "L",x,y
+END
+
+'-------------------
+' PRINT_MZ
+DEF PRINT_MZ str0$
+ VAR i
+ VAR str_ascii,str_mz
+ VAR input_str$,output_num
+ VAR str1$
+ DIM chr_mz[1]
+ ' DUMMY
+ str1$=str0$+"0"
+ IF mz_mode==0 OR mz_mode==2 THEN
+  PRINT str0$
+ ENDIF
+ IF mz_mode>=1 THEN
+  ' DEBUG
+  'PRINT "r_ptr &H";HEX$(mz_buff_r_ptr)
+  'PRINT "buff  &H";HEX$(mz_buff_addr[mz_buff_r_ptr])
+  ' MZ-80C ORIGINAL CHAR
+  'FOR i=0 TO LEN(str1$)-1
+  FOR i=0 TO LEN(str1$)-1
+   'str_ascii=ASC(str0$[i])
+   str_ascii=ASC(str1$[i])
+   str_mz=-1
+   IF (str_ascii>=ASC("A")) AND (str_ascii<=ASC("Z")) THEN
+    ' A-Z
+    str_mz=str_ascii-ASC("A")+&H01
+   ELSEIF (str_ascii>=ASC("a")) AND (str_ascii<=ASC("z")) THEN
+    ' a-z
+    str_mz=str_ascii-ASC("a")+&H01
+   ELSEIF (str_ascii>=ASC("0")) AND (str_ascii<=ASC("9")) THEN
+    ' 0-9
+    str_mz=str_ascii-ASC("0")+&H20
+   ELSEIF (str_ascii>=ASC("!")) AND (str_ascii<=ASC(")")) THEN
+    ' !"#$%&'()
+    str_mz=str_ascii-ASC("!")+&H61
+   ELSE
+    ' TABLE REFARENCE
+    RESTORE @CONV_STR_TABLE
+    WHILE 1
+     READ input_str$,output_num
+     IF input_str$=="" THEN BREAK
+     IF str_ascii==ASC(input_str$) THEN
+      str_mz=output_num
+      BREAK
+     ENDIF
+    WEND
+    IF str_mz==-1 THEN
+     ' ETC.(SPACE)
+     str_mz=&H00
+    ENDIF
+   ENDIF
+   ' DEBUG
+   'PRINT "ASC  &H";HEX$(str_ascii)
+   'PRINT "MZ   &H";HEX$(str_MZ)
+   'PRINT "addr &H";HEX$(mz_buff_addr[mz_buff_r_ptr])
+   IF str_mz<0 THEN str_mz=0
+   ' LAST CHAR
+   IF i>=LEN(str1$)-1 THEN
+    str_mz=-1
+   ENDIF
+   'EMUMEM mz_console_addr, str_mz
+   'mz_console_addr=mz_console_addr+1
+   'EMUMEM mz_buff_addr[mz_buff_r_ptr], str_mz
+   'mz_buff_addr[mz_buff_r_ptr]=mz_buff_addr[mz_buff_r_ptr]+1
+   chr_mz[0]=str_mz
+   COPY mz_buff_chr,mz_console_x_max*mz_buff_w_ptr+i,chr_mz
+   ' DEBUG
+   'PRINT "chr  &H";HEX$(chr_mz[0])
+   'PRINT "ptr  &H";HEX$(mz_console_x_max*mz_buff_w_ptr+i)
+   'PRINT "buff  &H";HEX$(mz_buff_chr[mz_console_x_max*mz_buff_w_ptr+i])
+  NEXT
+  'mz_buff_r_ptr=mz_buff_r_ptr+1
+  'IF mz_buff_r_ptr>=mz_buff_max THEN mz_buff_r_ptr=0
+  mz_buff_w_ptr=mz_buff_w_ptr+1
+  IF mz_buff_w_ptr>=mz_buff_max THEN mz_buff_w_ptr=0
+ ENDIF
+
+ @CONV_STR_TABLE
+  ' ASCII KIGOU
+  DATA "*",&H6B
+  DATA "+",&H6A
+  DATA ",",&H2F
+  DATA "-",&H2A
+  DATA ".",&H2E
+  DATA "/",&H2D
+  DATA ":",&H4F
+  DATA ";",&H2C
+  DATA "<",&H51
+  DATA "=",&H2B
+  DATA ">",&H57
+  DATA "?",&H49
+  DATA "@",&H55
+  DATA "[",&H52
+  DATA "\",&HDD
+  DATA "]",&H54
+  DATA "|",&H35
+  DATA "=",&H2B
+  ' KANA
+  DATA "チ",&H81
+  DATA "コ",&H82
+  DATA "ソ",&H83
+  DATA "シ",&H84
+  DATA "イ",&H85
+  DATA "ハ",&H86
+  DATA "キ",&H87
+  DATA "ク",&H88
+  DATA "ニ",&H89
+  DATA "マ",&H8A
+  DATA "ノ",&H8B
+  DATA "リ",&H8C
+  DATA "モ",&H8D
+  DATA "ミ",&H8E
+  DATA "ラ",&H8F
+  DATA "セ",&H90
+  DATA "タ",&H91
+  DATA "ス",&H92
+  DATA "ト",&H93
+  DATA "カ",&H94
+  DATA "ナ",&H95
+  DATA "ヒ",&H96
+  DATA "テ",&H97
+  DATA "サ",&H98
+  DATA "ン",&H99
+  DATA "ツ",&H9A
+  DATA "ロ",&H9B
+  DATA "ケ",&H9C
+  DATA "「",&H9D
+  DATA "ァ",&H9E
+  DATA "ャ",&H9F
+  DATA "ワ",&HA0
+  DATA "ヌ",&HA1
+  DATA "フ",&HA2
+  DATA "ア",&HA3
+  DATA "ウ",&HA4
+  DATA "エ",&HA5
+  DATA "オ",&HA6
+  DATA "ヤ",&HA7
+  DATA "ユ",&HA8
+  DATA "ヨ",&HA9
+  DATA "ホ",&H9A
+  DATA "ヘ",&HAB
+  DATA "レ",&HAC
+  DATA "メ",&HAD
+  DATA "ル",&HAE
+  DATA "ネ",&HAF
+  DATA "ム",&HB0
+  DATA "」",&HB1
+  DATA "ィ",&HB2
+  DATA "ュ",&HB3
+  DATA "ヲ",&HB4
+  DATA "、",&HB5
+  DATA "ゥ",&HB6
+  DATA "ョ",&HB7
+  DATA "゜",&HB8
+  DATA "．",&HB9
+  DATA "ェ",&HBA
+  DATA "ッ",&HBB
+  DATA "゛",&HBC
+  DATA "。",&HBD
+  DATA "ォ",&HBE
+  DATA "ー",&HBF
+  ' KIGOU
+  'DATA "",&H10
+  'DATA "",&H11
+  'DATA "",&H12
+  'DATA "",&H13
+  'DATA "",&H14
+  'DATA "",&H15
+  'DATA "",&H16
+  'DATA "",&H17
+  'DATA "",&H18
+  'DATA "",&H19
+  'DATA "",&H1A
+  DATA "",&H1B
+  DATA "",&H1C
+  DATA "",&H1D
+  DATA "",&H1E
+  DATA "",&H1F
+  'DATA "",&H30
+  'DATA "",&H31
+  'DATA "",&H32
+  'DATA "",&H33
+  'DATA "",&H34
+  'DATA "",&H35
+  'DATA "",&H36
+  DATA "",&H37
+  'DATA "",&H38
+  DATA "",&H39
+  'DATA "",&H3A
+  'DATA "",&H3B
+  DATA "",&H3C
+  'DATA "",&H3D
+  DATA "",&H3E
+  'DATA "",&H3F
+  DATA "　",&H40
+  DATA "♠",&H41
+  DATA "",&H42
+  DATA "",&H43
+  DATA "♦",&H44
+  DATA "←",&H45
+  DATA "♣",&H46
+  DATA "●",&H47
+  DATA "",&H48
+  DATA "？",&H49
+  DATA "",&H4A
+  'DATA "",&H4B
+  'DATA "",&H4C
+  DATA "",&H4D
+  DATA "",&H4E
+  DATA "：",&H4F
+  DATA "↑",&H50
+  DATA "＜",&H51
+  DATA "[",&H52
+  DATA "♥",&H53
+  DATA "]",&H54
+  DATA "＠",&H55
+  DATA "",&H56
+  DATA "＞",&H57
+  'DATA "",&H58
+  'DATA "",&H59
+  DATA "",&H5A
+  'DATA "",&H5B
+  DATA "",&H5C
+  DATA "",&H5D
+  DATA "",&H5E
+  DATA "",&H5F
+  'DATA "",&H60
+  'DATA "",&H61
+  'DATA "",&H62
+  'DATA "",&H63
+  'DATA "",&H64
+  'DATA "",&H65
+  'DATA "",&H66
+  'DATA "",&H67
+  'DATA "",&H68
+  'DATA "",&H69
+  'DATA "",&H6A
+  'DATA "",&H6B
+  'DATA "",&H6C
+  DATA "",&H6D
+  'DATA "",&H6E
+  'DATA "",&H6F
+  'DATA "",&H70
+  'DATA "",&H71
+  'DATA "",&H72
+  'DATA "",&H73
+  'DATA "",&H74
+  'DATA "",&H75
+  DATA "",&H76
+  DATA "",&H77
+  'DATA "",&H78
+  'DATA "",&H79
+  DATA "",&H7A
+  'DATA "",&H7B
+  'DATA "",&H7C
+  'DATA "",&H7D
+  DATA "",&H7E
+  'DATA "",&H7F
+  DATA "",&HC0
+  'DATA "",&HC1
+  'DATA "",&HC2
+  'DATA "",&HC3
+  'DATA "",&HC4
+  'DATA "",&HC5
+  'DATA "",&HC6
+  DATA "",&HC7
+  DATA "",&HC8
+  DATA "",&HC9
+  DATA "",&HCA
+  DATA "",&HCB
+  DATA "",&HCC
+  DATA "",&HCD
+  DATA "",&HCE
+  DATA "",&HCF
+  ' KANJI
+  DATA "日",&HD0
+  DATA "月",&HD1
+  DATA "火",&HD2
+  DATA "水",&HD3
+  DATA "木",&HD4
+  DATA "金",&HD5
+  DATA "土",&HD6
+  DATA "生",&HD7
+  DATA "年",&HD8
+  DATA "時",&HD9
+  DATA "分",&HDA
+  DATA "秒",&HDB
+  DATA "円",&HDC
+  DATA "￥",&HDD
+  DATA "£",&HDE
+  DATA "",&HDF
+  'DATA "",&HE0
+  'DATA "",&HE1
+  'DATA "",&HE2
+  'DATA "",&HE3
+  'DATA "",&HE4
+  'DATA "",&HE5
+  'DATA "",&HE6
+  'DATA "",&HE7
+  'DATA "",&HE8
+  'DATA "",&HE9
+  'DATA "",&HEA
+  'DATA "",&HEB
+  DATA "",&HEC
+  DATA "",&HED
+  'DATA "",&HEE
+  'DATA "",&HEF
+  ' 2*2 DOT
+  'DATA "",&HF0
+  DATA "",&HF1
+  DATA "",&HF2
+  DATA "",&HF3
+  DATA "",&HF4
+  DATA "",&HF5
+  DATA "",&HF6
+  DATA "",&HF7
+  DATA "",&HF8
+  DATA "",&HF9
+  DATA "",&HFA
+  DATA "",&HFB
+  DATA "",&HFC
+  DATA "",&HFD
+  DATA "",&HFE
+  DATA "",&HFF
+  DATA "",0
+END
+

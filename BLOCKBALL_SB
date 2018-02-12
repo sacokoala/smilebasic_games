@@ -1,0 +1,324 @@
+'=======================================
+' ブロック崩し モドキ
+' 2017/11/23 sacokoala
+'=======================================
+ACLS
+PRINT "そうさほうほう　の　せんたく"
+'INPUT "０：スライド　１：タッチ　２：キーボード";MODE
+INPUT "０：コントローラー　１：キーボード";MODE
+
+CLS
+'XSCREEN 2
+XSCREEN 320,240
+VISIBLE 1,1,1
+'IF MODE==1 THEN DISPLAY 1
+ZANKI=0
+WHILE 1
+ GOSUB @INITGAME
+ BEEP 1
+ MESSAGE "STAGE "+STR$(STAGE)
+ WHILE 1
+  GOSUB @PADDLE
+  GOSUB @BALL
+  GOSUB @STATUS
+  IF (BCNT<=0) OR (ZANKI<=0) THEN BREAK
+  VSYNC 1
+ WEND
+ IF BCNT<=0 THEN
+  BEEP 5
+  MESSAGE "CLEAR!"
+  STAGE=STAGE+1
+  'IF STAGE>3 THEN BREAK
+  IF STAGE>3 THEN STAGE=1
+ ELSE
+  MESSAGE "GAME OVER"
+ ENDIF
+WEND
+END
+
+'初期化
+@INITGAME
+'FOR i=0 TO 320 STEP 8
+' GLINE i,0,i,239,RGB(0,64,0)
+' GLINE 0,i,319,i,RGB(0,64,0)
+'NEXT
+FOR i=0 TO 320 STEP 8
+ GLINE i,0,i,239-16,RGB(0,64,0)
+ IF i<240-16 THEN
+  GLINE 0,i,319,i,RGB(0,64,0)
+ ENDIF
+NEXT
+IF ZANKI<=0 THEN
+ STAGE=1
+ SCORE=0
+ ZANKI=3
+ GOSUB @TITLE
+ENDIF
+
+GOSUB @INITMAP
+GOSUB @INITPADDLE
+GOSUB @INITBALL
+GOSUB @STATUS
+RETURN
+
+'パドル初期化
+@INITPADDLE
+AN=0
+SPSET AN,3522
+SPOFS AN,160,220
+SPCOL AN,TRUE
+RETURN
+
+'ボール初期化
+@INITBALL
+BN=1
+SPSET BN,3525
+SPOFS BN,160,160
+'SPOFS AN OUT AX,AY
+'SPOFS BN,AX,AY-8
+SPCOL BN,TRUE
+'SPHIDE BN
+X1=0
+Y1=1
+'R=30
+'SPD=2
+'X1=COS(R)*SPD
+'Y1=SIN(R)*SPD
+SPOFS BN OUT BX,BY
+RETURN
+
+'マップ初期化
+@INITMAP
+'LAY=0
+'BGSCREEN LAY,25,15
+'BGOFS LAY,0,0,0
+DIM LAY[25,14]
+RESTORE "@MAP"+STR$(STAGE)
+BCNT=0
+FOR j=0 TO 14-1
+ READ A$
+ FOR i=O TO LEN(A$)-1
+  C=VAL(MID$(A$,i,1))
+  BGPUT LAY,i,j,C
+  IF C>1 THEN BCNT=BCNT+1
+ NEXT
+NEXT
+RETURN
+
+
+'メッセージ
+DEF MESSAGE A$
+ TY=14
+ 'COLOR 11,0
+ COLOR #PURPLE
+ LOCATE 20-(LEN(A$)/2),TY:PRINT A$
+ COLOR #WHITE
+ WAIT 120
+ LOCATE 2,TY:PRINT " "*36
+END
+
+'ステータス
+@STATUS
+'COLOR 13,8
+COLOR #AQUA,#NAVY
+LOCATE 8,0
+PRINT " SCORE ";FORMAT$("%05D",SCORE);
+PRINT "   PLAYERx",ZANKI;" "
+COLOR #WHITE,0
+RETURN
+
+'パドル
+@PADDLE
+SPOFS AN OUT AX,AY
+IF MODE==0 THEN
+ 'STICK OUT SX,SY
+ SX=STICK(#STICK_LX)/32768
+ SY=STICK(#STICK_LY)/32768
+ AX=AX+(SX*8)
+ELSE
+ SX=0
+ C$=INKEY$()
+ IF c$=="Z" THEN SX=-1 
+ IF c$=="C" THEN SX=1
+ IF c$=="," THEN SX=-1
+ IF c$=="/" THEN SX=1
+ AX=AX+(SX*8)
+ENDIF
+IF AX<32  THEN AX=32
+IF AX>288 THEN AX=288
+SPOFS AN,AX,AY
+RETURN
+
+'ボール
+@BALL
+SPOFS BN OUT X,Y
+IF SPHITSP(AN)==BN THEN
+ 'BEEP 9,-1000
+ BEEP 4
+ Y=AY-8
+ R=ATAN(Y-AY,X-AX)
+ SPD=2
+ X1=COS(R)*SPD
+ Y1=SIN(R)*SPD
+ENDIF
+IF BGHIT(X+0,Y-4) THEN Y1=-Y1
+IF BGHIT(X+0,Y+4) THEN Y1=-Y1
+IF BGHIT(X-4,Y+0) THEN X1=-X1
+IF BGHIT(X+4,Y+0) THEN X1=-X1
+X=X+X1
+Y=Y+Y1
+SPOFS BN, X, Y
+'IF Y>248 THEN
+IF Y>224 THEN
+ BEEP 3
+ MESSAGE "MISS"
+ ZANKI=ZANKI-1
+ IF ZANKI THEN
+  GOSUB @INITPADDLE
+  GOSUB @INITBALL
+ ENDIF
+ENDIF
+RETURN
+
+'ブロック　あたり判定
+DEF BGHIT(X,Y)
+ IF X<0 OR Y<0 OR X>399 OR Y>239 THEN
+  RETURN 0
+ ENDIF
+ BX=FLOOR(X/16)
+ BY=FLOOR(Y/16)
+ C=BGGET(LAY,BX,BY)
+ 'IF C>0 THEN BEEP 9,C*500
+ IF C>0 THEN BEEP 4
+ IF C>1 THEN
+  BGPUT LAY,BX,BY,0
+  SCORE=SCORE+10
+  BCNT=BCNT-1
+ ENDIF
+ RETURN C
+END
+
+'タイトル
+@TITLE
+STAGE=0
+GOSUB @INITMAP
+STAGE=1
+'COLOR 15,2
+COLOR #WHITE,#MAROON
+LOCATE 11,4:PRINT "                 "
+LOCATE 11,5:PRINT " >>> ブロックくずし <<< "
+LOCATE 11,6:PRINT "                 "
+LOCATE 11,7:PRINT " PUSH ANY BUTTON "
+LOCATE 11,8:PRINT "                 "
+'COLOR 15,0
+COLOR #WHITE,0
+'WHILE BUTTON(1)==0
+FOR i=0 TO 30
+ 'キーリピート
+ C$=INKEY$()
+NEXT
+WHILE 1
+ IF BUTTON()!=0 THEN BREAK
+ IF INKEY$()!="" THEN BREAK
+ VSYNC 1
+WEND
+CLS
+RETURN
+
+'ステージデータ
+@MAP0
+DATA "11111111111111111111"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+@MAP1
+DATA "11111111111111111111"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1  22222222222222  1"
+DATA "1  22222222222222  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+@MAP2
+DATA "11111111111111111111"
+DATA "1                  1"
+DATA "1  2222222222      1"
+DATA "1   2222222222     1"
+DATA "1    2222222222    1"
+DATA "1     2222222222   1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+@MAP3
+DATA "11111111111111111111"
+DATA "1                  1"
+DATA "1  222222  222222  1"
+DATA "1  2    2112    2  1"
+DATA "1  2    2112    2  1"
+DATA "1  222222  222222  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+DATA "1                  1"
+
+
+'-------------------------
+'BG
+DEF BGPUT BUFF,X,Y,CHR
+ BUFF[X,Y]=CHR
+ BG0$="  "
+ BG1$="  "
+ IF CHR==0 THEN
+  BG0$="  "
+  BG1$="  "
+ ELSEIF CHR==1 THEN
+  COLOR #GRAY
+  BG0$=""
+  BG1$=""
+ ELSEIF CHR==2 THEN
+  COLOR #WHITE
+  BG0$=""
+  BG1$=""
+ ENDIF
+ LOCATE X*2,Y*2
+ PRINT BG0$
+ LOCATE X*2,Y*2+1
+ PRINT BG1$
+ COLOR #WHITE
+END
+
+DEF BGGET(BUFF,X,Y)
+ IF Y>=14 THEN RETURN 0
+ RETURN BUFF[X,Y]
+END
+
